@@ -1,0 +1,77 @@
+@startuml SDCMS_Seq_Login
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 12
+skinparam ArrowColor #1B4F72
+skinparam ArrowThickness 1.1
+skinparam sequence {
+  ParticipantBackgroundColor #EAF2F8
+  ParticipantBorderColor #1B4F72
+  ActorBackgroundColor #FDF2E3
+  ActorBorderColor #1B4F72
+  LifeLineBorderColor #85929E
+  LifeLineBackgroundColor #D5F0EC
+  BoxBackgroundColor #FBFDFE
+  BoxBorderColor #1B4F72
+}
+
+title <size:16><b>Sequence Diagram 1 — Staff Authentication</b></size>
+
+actor "Staff" as U
+participant "LoginView\n<<JavaFX>>" as V
+participant "RestApiClient" as C
+participant "AuthController\n<<REST>>" as AC
+participant "AuthenticationService" as AS
+participant "UserRepository" as UR
+database "MySQL" as DB
+
+U -> V : enter username & password
+activate V
+V -> V : validateNotEmpty()
+
+alt fields are empty
+    V --> U : "Username and password required"
+else fields valid
+    V -> C : login(username, password)
+    activate C
+    C -> AC : POST /api/auth/login
+    activate AC
+    AC -> AS : authenticate(username, password)
+    activate AS
+    AS -> UR : findByUsername(username)
+    activate UR
+    UR -> DB : SELECT * FROM users
+    DB --> UR : user record
+    UR --> AS : Optional<User>
+    deactivate UR
+
+    alt user not found OR account locked
+        AS --> AC : AuthenticationException
+        AC --> C : 401 Unauthorized
+        C --> V : error
+        V --> U : "Invalid credentials or account locked"
+    else credentials match (BCrypt)
+        AS -> AS : BCrypt.verify(password, hash)
+        AS -> AS : resetFailedAttempts()
+        AS -> AS : generateJwtToken(user)
+        AS --> AC : JWT token + role
+        deactivate AS
+        AC --> C : 200 OK {token, role}
+        deactivate AC
+        C --> V : SessionToken
+        deactivate C
+        V -> V : loadDashboard(role)
+        V --> U : display role-based main menu
+    end
+end
+deactivate V
+
+note right of AS #FDF2E3
+  After 3 failed attempts the
+  account is locked for 15 minutes
+  (brute-force protection)
+end note
+
+@enduml

@@ -1,0 +1,103 @@
+@startuml SDCMS_Architecture
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 12
+skinparam ArrowColor #1B4F72
+skinparam ArrowThickness 1.2
+skinparam linetype ortho
+
+skinparam node {
+  BackgroundColor #FBFDFE
+  BorderColor #1B4F72
+  FontColor #1B4F72
+  FontStyle bold
+}
+skinparam component {
+  BackgroundColor #EAF2F8
+  BorderColor #1B4F72
+  FontColor #1C2833
+  BorderThickness 1.1
+}
+skinparam database {
+  BackgroundColor #FDF2E3
+  BorderColor #1B4F72
+  FontColor #1C2833
+}
+skinparam package {
+  BackgroundColor #FBFDFE
+  BorderColor #1B4F72
+  FontColor #1B4F72
+  FontStyle bold
+}
+
+title <size:16><b>Sunrise Dental Clinic Management System</b></size>\n<size:13>Deployment and Layered Architecture</size>
+
+node "Reception Workstation\n<<Windows PC>>" as N1 {
+  package "Presentation Tier" {
+    component "JavaFX Client\n<<sdcms-client>>" as CLIENT
+    component "ViewControllers\n(FXML + MVC)" as VC
+    component "RestApiClient\n(HttpClient + Jackson)" as API
+    component "InputValidator" as IV
+  }
+}
+
+node "Dentist Workstation\n<<Windows PC>>" as N2 {
+  component "JavaFX Client\n(read-only role)" as CLIENT2
+}
+
+node "Clinic Application Server\n<<Linux / Tomcat embedded>>" as N3 {
+  package "Application Tier — Spring Boot 3.2" {
+    component "REST Controllers\n@RestController" as CTRL
+    component "Security Filter\nJWT + BCrypt" as SEC
+    component "Service Layer\n@Service" as SVC
+    component "Design Patterns\nStrategy / Factory /\nBuilder / Observer" as PAT
+    component "Repository Layer\n@Repository (JPA)" as REPO
+    component "PDF Engine\niText 7" as PDF
+  }
+}
+
+node "Database Server\n<<Linux>>" as N4 {
+  database "MySQL 8.0\n<<sdcms_db>>" as DB {
+  }
+}
+
+CLIENT  --> VC
+VC      --> IV
+VC      --> API
+CLIENT2 --> API
+
+API   --> SEC  : <b>HTTPS / JSON</b>\nport 8443
+SEC   --> CTRL : authenticated request
+CTRL  --> SVC  : DTO
+SVC   --> PAT  : delegates
+SVC   --> REPO : entity operations
+SVC   --> PDF  : bill rendering
+REPO  --> DB   : <b>JDBC / HikariCP</b>\nport 3306
+
+note right of SEC #FDF2E3
+  <b>Stateless authentication.</b>
+  Every request carries a JWT bearer
+  token. No server-side session state,
+  so additional clients may connect
+  without server reconfiguration.
+end note
+
+note bottom of DB #FDF2E3
+  Composite UNIQUE constraint on
+  (dentist_id, appointment_date, appointment_time)
+  serialises concurrent booking attempts
+  from multiple workstations.
+end note
+
+note left of N1 #FDF2E3
+  <b>Distributed deployment.</b>
+  Multiple workstations share one
+  authoritative data store — the
+  structural fix for the isolated
+  paper records described in
+  the scenario.
+end note
+
+@enduml

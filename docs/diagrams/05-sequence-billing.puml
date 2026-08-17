@@ -1,0 +1,96 @@
+@startuml SDCMS_Seq_Billing
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 12
+skinparam ArrowColor #1B4F72
+skinparam ArrowThickness 1.1
+skinparam sequence {
+  ParticipantBackgroundColor #EAF2F8
+  ParticipantBorderColor #1B4F72
+  ActorBackgroundColor #FDF2E3
+  ActorBorderColor #1B4F72
+  LifeLineBorderColor #85929E
+  LifeLineBackgroundColor #D5F0EC
+}
+
+title <size:16><b>Sequence Diagram 3 — Calculate and Print Bill</b></size>
+
+actor "Receptionist" as R
+participant "BillingView\n<<JavaFX>>" as V
+participant "RestApiClient" as C
+participant "BillingController\n<<REST>>" as BC
+participant "BillingService" as BS
+participant "IBillingStrategy\n<<Strategy>>" as ST
+participant "PdfReceiptGenerator" as PDF
+participant "BillRepository" as BR
+database "MySQL" as DB
+
+R -> V : enter appointment number
+activate V
+V -> C : generateBill(appointmentNo)
+activate C
+C -> BC : POST /api/bills/generate/{aptNo}
+activate BC
+BC -> BS : generateBill(aptNo)
+activate BS
+
+BS -> DB : fetch Appointment + Treatment + Patient
+DB --> BS : Appointment
+
+alt appointment not found
+    BS --> BC : ResourceNotFoundException
+    BC --> C : 404 Not Found
+    C --> V : error
+    V --> R : "Appointment number not found"
+else appointment found
+
+    alt patient.isSeniorCitizen()
+        BS -> BS : setStrategy(new SeniorCitizenBilling())
+    else standard patient
+        BS -> BS : setStrategy(new StandardBilling())
+    end
+
+    BS -> ST : calculate(appointment)
+    activate ST
+    ST -> ST : consultationFee + treatmentCost
+    ST -> ST : applyDiscount()
+    ST -> ST : applyVAT(8%)
+    ST --> BS : totalAmount
+    deactivate ST
+
+    BS -> BR : save(bill)
+    activate BR
+    BR -> DB : INSERT INTO bills
+    DB --> BR : committed
+    BR --> BS : Bill
+    deactivate BR
+
+    BS -> PDF : generate(bill)
+    activate PDF
+    PDF --> BS : receipt.pdf
+    deactivate PDF
+
+    BS --> BC : Bill + PDF path
+    deactivate BS
+    BC --> C : 201 Created
+    deactivate BC
+    C --> V : BillDTO
+    deactivate C
+    V --> R : display bill summary
+    R -> V : click "Print Receipt"
+    V --> R : PDF receipt printed
+end
+deactivate V
+
+note right of ST #FDF2E3
+  <b>Strategy Pattern in action.</b>
+  BillingService never changes when
+  a new pricing rule is introduced.
+  All money uses BigDecimal to avoid
+  the floating-point rounding errors
+  described in the scenario.
+end note
+
+@enduml

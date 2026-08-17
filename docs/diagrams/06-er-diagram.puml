@@ -1,0 +1,143 @@
+@startuml SDCMS_ERD
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 12
+skinparam ArrowColor #1B4F72
+skinparam ArrowThickness 1.1
+skinparam linetype ortho
+
+skinparam class {
+  BackgroundColor #EAF2F8
+  BorderColor #1B4F72
+  BorderThickness 1.2
+  FontColor #1C2833
+  AttributeFontColor #34495E
+  StereotypeFontColor #1B4F72
+}
+
+title <size:16><b>Sunrise Dental Clinic Management System</b></size>\n<size:13>Entity Relationship Diagram (Physical Model — MySQL 8.0)</size>
+
+entity "users" as users #FDF2E3 {
+  * <b>user_id</b> : BIGINT <<PK, AUTO_INCREMENT>>
+  --
+  * username : VARCHAR(50) <<UNIQUE>>
+  * password_hash : VARCHAR(60)
+  * full_name : VARCHAR(100)
+  * role : ENUM('ADMINISTRATOR','RECEPTIONIST','DENTIST')
+  * is_active : BOOLEAN <<DEFAULT TRUE>>
+  * failed_attempts : INT <<DEFAULT 0>>
+    locked_until : DATETIME <<NULL>>
+  * created_at : DATETIME
+}
+
+entity "dentists" as dentists {
+  * <b>dentist_id</b> : BIGINT <<PK, AUTO_INCREMENT>>
+  --
+  * <i>user_id</i> : BIGINT <<FK, UNIQUE>>
+  * license_no : VARCHAR(30) <<UNIQUE>>
+  * specialization : VARCHAR(80)
+  * available_from : TIME
+  * available_to : TIME
+    consultation_room : VARCHAR(10)
+  * is_active : BOOLEAN
+}
+
+entity "patients" as patients {
+  * <b>patient_id</b> : BIGINT <<PK, AUTO_INCREMENT>>
+  --
+  * full_name : VARCHAR(100)
+  * address : VARCHAR(255)
+  * contact_no : VARCHAR(15) <<UNIQUE>>
+    email : VARCHAR(100)
+  * date_of_birth : DATE
+  * gender : ENUM('MALE','FEMALE','OTHER')
+    medical_notes : TEXT
+  * registered_date : DATE
+}
+
+entity "treatments" as treatments {
+  * <b>treatment_id</b> : BIGINT <<PK, AUTO_INCREMENT>>
+  --
+  * name : VARCHAR(80) <<UNIQUE>>
+    description : VARCHAR(255)
+  * base_cost : DECIMAL(10,2)
+  * duration_minutes : INT
+  * is_active : BOOLEAN
+}
+
+entity "appointments" as appointments #D5F0EC {
+  * <b>appointment_no</b> : VARCHAR(20) <<PK>>
+  --
+  * <i>patient_id</i> : BIGINT <<FK>>
+  * <i>dentist_id</i> : BIGINT <<FK>>
+  * <i>treatment_id</i> : BIGINT <<FK>>
+  * appointment_date : DATE
+  * appointment_time : TIME
+  * status : ENUM('SCHEDULED','COMPLETED',
+        'CANCELLED','NO_SHOW')
+    notes : VARCHAR(255)
+  * <i>created_by</i> : BIGINT <<FK → users>>
+  * created_at : DATETIME
+  --
+  <b>UNIQUE</b> (dentist_id, appointment_date,
+         appointment_time)
+}
+
+entity "bills" as bills {
+  * <b>bill_id</b> : VARCHAR(20) <<PK>>
+  --
+  * <i>appointment_no</i> : VARCHAR(20) <<FK, UNIQUE>>
+  * consultation_fee : DECIMAL(10,2)
+  * treatment_cost : DECIMAL(10,2)
+  * discount_amount : DECIMAL(10,2)
+  * tax_amount : DECIMAL(10,2)
+  * total_amount : DECIMAL(10,2)
+  * payment_status : ENUM('PENDING','PAID','REFUNDED')
+    payment_method : ENUM('CASH','CARD','INSURANCE')
+  * <i>issued_by</i> : BIGINT <<FK → users>>
+  * issued_date : DATETIME
+}
+
+entity "audit_log" as audit {
+  * <b>log_id</b> : BIGINT <<PK, AUTO_INCREMENT>>
+  --
+  * <i>user_id</i> : BIGINT <<FK>>
+  * action : VARCHAR(50)
+  * entity_name : VARCHAR(50)
+    entity_id : VARCHAR(30)
+  * timestamp : DATETIME
+    ip_address : VARCHAR(45)
+}
+
+users     ||--o| dentists     : "is a"
+patients  ||--o{ appointments : "books"
+dentists  ||--o{ appointments : "attends"
+treatments ||--o{ appointments : "specifies"
+users     ||--o{ appointments : "created by"
+appointments ||--|| bills      : "generates"
+users     ||--o{ bills         : "issued by"
+users     ||--o{ audit         : "performs"
+
+note bottom of appointments #FDF2E3
+  <b>Composite UNIQUE constraint</b> on
+  (dentist_id, appointment_date, appointment_time)
+  enforces the no-double-booking rule at the
+  <i>database</i> level, not only in application code.
+end note
+
+note right of bills #FDF2E3
+  All monetary columns use <b>DECIMAL(10,2)</b>
+  rather than FLOAT/DOUBLE to eliminate the
+  rounding errors described in the scenario.
+end note
+
+note left of users #FDF2E3
+  <b>Assumption:</b> Dentists are also system
+  users, so <i>dentists</i> extends <i>users</i> in a
+  1:0..1 relationship rather than duplicating
+  login credentials across two tables.
+end note
+
+@enduml

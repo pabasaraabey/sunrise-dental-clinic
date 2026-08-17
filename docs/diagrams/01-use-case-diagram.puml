@@ -1,0 +1,124 @@
+@startuml SDCMS_UseCase
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 13
+skinparam ArrowColor #1B4F72
+skinparam ArrowThickness 1.2
+
+skinparam actor {
+  BackgroundColor #EAF2F8
+  BorderColor #1B4F72
+  FontColor #1C2833
+  FontStyle bold
+}
+skinparam usecase {
+  BackgroundColor #EAF2F8
+  BorderColor #1B4F72
+  FontColor #1C2833
+  BorderThickness 1.2
+}
+skinparam package {
+  BackgroundColor #FBFDFE
+  BorderColor #1B4F72
+  FontColor #1B4F72
+  FontStyle bold
+}
+
+title <size:16><b>Sunrise Dental Clinic Management System</b></size>\n<size:13>Use Case Diagram</size>
+
+left to right direction
+skinparam nodesep 45
+skinparam ranksep 65
+
+actor "Staff" as Staff #FDF2E3
+actor "Administrator" as Admin
+actor "Receptionist" as Recep
+actor "Dentist" as Dentist
+
+Admin   --|> Staff
+Recep   --|> Staff
+Dentist --|> Staff
+
+
+  package "Security" {
+    usecase "Login to System"        as UC1
+    usecase "Validate Credentials"   as UC2
+    usecase "Lock Account"           as UC3
+    usecase "Logout / Exit System"   as UC4
+  }
+
+  package "Patient & Appointment" {
+    usecase "Register New Patient"       as UC5
+    usecase "Register New Appointment"   as UC6
+    usecase "Check Slot Availability"    as UC7
+    usecase "Display Appointment Details" as UC8
+    usecase "Cancel Appointment"         as UC9
+    usecase "Reschedule Appointment"     as UC10
+  }
+
+  package "Billing" {
+    usecase "Calculate Bill"          as UC11
+    usecase "Apply Senior Discount"   as UC12
+    usecase "Print Bill / Receipt"    as UC13
+    usecase "Record Payment"          as UC14
+  }
+
+  package "Administration" {
+    usecase "Manage Staff Accounts"    as UC15
+    usecase "Manage Dentist Profiles"  as UC16
+    usecase "Manage Treatment Prices"  as UC17
+    usecase "Generate Reports"         as UC18
+  }
+
+  package "Support" {
+    usecase "View Help Section"        as UC19
+    usecase "View Own Schedule"        as UC20
+    usecase "View Patient History"     as UC21
+  }
+
+Staff   --> UC1
+Staff   --> UC4
+Staff   --> UC19
+
+Recep   --> UC5
+Recep   --> UC6
+Recep   --> UC8
+Recep   --> UC9
+Recep   --> UC10
+Recep   --> UC11
+Recep   --> UC13
+Recep   --> UC14
+
+Dentist --> UC20
+Dentist --> UC21
+Dentist --> UC8
+
+Admin   --> UC15
+Admin   --> UC16
+Admin   --> UC17
+Admin   --> UC18
+
+UC1  ..> UC2  : <<include>>
+UC6  ..> UC7  : <<include>>
+UC6  ..> UC5  : <<include>>
+UC11 ..> UC8  : <<include>>
+UC13 ..> UC11 : <<include>>
+
+UC2  <.. UC3  : <<extend>>
+UC11 <.. UC12 : <<extend>>
+
+note right of UC7 #FDF2E3
+  Prevents double booking —
+  the core problem stated
+  in the scenario
+end note
+
+note bottom of UC15 #FDF2E3
+  <b>Assumption:</b> Three roles
+  (Admin / Receptionist / Dentist)
+  enforce separation of duties
+end note
+
+@enduml

@@ -1,0 +1,108 @@
+@startuml SDCMS_Seq_Appointment
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 12
+skinparam ArrowColor #1B4F72
+skinparam ArrowThickness 1.1
+skinparam sequence {
+  ParticipantBackgroundColor #EAF2F8
+  ParticipantBorderColor #1B4F72
+  ActorBackgroundColor #FDF2E3
+  ActorBorderColor #1B4F72
+  LifeLineBorderColor #85929E
+  LifeLineBackgroundColor #D5F0EC
+}
+
+title <size:16><b>Sequence Diagram 2 — Register New Appointment</b></size>
+
+actor "Receptionist" as R
+participant "AppointmentView\n<<JavaFX>>" as V
+participant "RestApiClient" as C
+participant "AppointmentController\n<<REST>>" as AC
+participant "AppointmentServiceImpl" as AS
+participant "AppointmentBuilder\n<<Builder>>" as AB
+participant "PatientRepository" as PR
+participant "AppointmentRepository" as AR
+participant "NotificationObserver\n<<Observer>>" as NO
+database "MySQL" as DB
+
+R -> V : select "Register New Appointment"
+activate V
+V -> C : getDentists() / getTreatments()
+C --> V : populate dropdowns
+R -> V : enter patient & appointment details
+V -> V : validateInputs()
+
+alt validation fails
+    V --> R : show field-level error messages
+else validation passes
+    V -> C : createAppointment(dto)
+    activate C
+    C -> AC : POST /api/appointments
+    activate AC
+    AC -> AS : book(dto)
+    activate AS
+
+    AS -> PR : findByContactNo(contactNo)
+    activate PR
+    PR -> DB : SELECT
+    DB --> PR : result
+    PR --> AS : Optional<Patient>
+    deactivate PR
+
+    alt patient not registered
+        AS -> PR : save(new Patient)
+        PR --> AS : Patient
+    end
+
+    AS -> AR : existsByDentistAndDateTime(...)
+    activate AR
+    AR -> DB : SELECT COUNT(*)
+    DB --> AR : count
+    AR --> AS : boolean
+    deactivate AR
+
+    alt slot already booked
+        AS --> AC : SlotUnavailableException
+        AC --> C : 409 Conflict
+        C --> V : error
+        V --> R : "Dentist unavailable — please choose another slot"
+    else slot is free
+        AS -> AB : withPatient().withDentist()\n.withTreatment().withDateTime()
+        activate AB
+        AB -> AB : generateAppointmentNo()
+        AB --> AS : Appointment
+        deactivate AB
+
+        AS -> AR : save(appointment)
+        activate AR
+        AR -> DB : INSERT
+        DB --> AR : committed
+        AR --> AS : saved Appointment
+        deactivate AR
+
+        AS -> NO : update(appointment)
+        activate NO
+        NO --> AS : ack
+        deactivate NO
+
+        AS --> AC : Appointment
+        deactivate AS
+        AC --> C : 201 Created
+        deactivate AC
+        C --> V : AppointmentDTO
+        deactivate C
+        V --> R : "Appointment APT-20260817-0042 confirmed"
+    end
+end
+deactivate V
+
+note right of AR #FDF2E3
+  Double-booking check is the
+  key control that solves the
+  clinic's stated problem
+end note
+
+@enduml

@@ -1,0 +1,260 @@
+@startuml SDCMS_Class
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 12
+skinparam ArrowColor #1B4F72
+skinparam ArrowThickness 1.1
+skinparam linetype ortho
+
+skinparam class {
+  BackgroundColor #EAF2F8
+  BorderColor #1B4F72
+  BorderThickness 1.2
+  FontColor #1C2833
+  AttributeFontColor #34495E
+  StereotypeFontColor #1B4F72
+}
+skinparam package {
+  BackgroundColor #FBFDFE
+  BorderColor #1B4F72
+  FontColor #1B4F72
+  FontStyle bold
+}
+
+title <size:16><b>Sunrise Dental Clinic Management System</b></size>\n<size:13>Class Diagram</size>
+
+package "Domain Model" {
+
+  abstract class User #FDF2E3 {
+    - userId : Long
+    - username : String
+    - passwordHash : String
+    - fullName : String
+    - role : Role
+    - isActive : boolean
+    - failedAttempts : int
+    + login(pwd : String) : boolean
+    + logout() : void
+    {abstract} + getPermissions() : Set<String>
+  }
+
+  class Administrator {
+    + getPermissions() : Set<String>
+    + manageStaff() : void
+    + updateTreatmentPrice() : void
+  }
+
+  class Receptionist {
+    - counterNo : String
+    + getPermissions() : Set<String>
+    + bookAppointment() : Appointment
+  }
+
+  class Dentist {
+    - dentistId : String
+    - specialization : String
+    - availableFrom : LocalTime
+    - availableTo : LocalTime
+    + getPermissions() : Set<String>
+    + isAvailable(dt : LocalDateTime) : boolean
+  }
+
+  class Patient {
+    - patientId : Long
+    - fullName : String
+    - address : String
+    - contactNo : String
+    - dateOfBirth : LocalDate
+    - gender : Gender
+    - registeredDate : LocalDate
+    + getAge() : int
+    + isSeniorCitizen() : boolean
+  }
+
+  class Appointment {
+    - appointmentNo : String
+    - appointmentDate : LocalDate
+    - appointmentTime : LocalTime
+    - status : AppointmentStatus
+    - notes : String
+    - createdAt : LocalDateTime
+    + generateAppointmentNo() : String
+    + cancel() : boolean
+    + reschedule(d, t) : boolean
+  }
+
+  class Treatment {
+    - treatmentId : Long
+    - name : String
+    - description : String
+    - baseCost : BigDecimal
+    - durationMinutes : int
+    + getBaseCost() : BigDecimal
+  }
+
+  class Bill {
+    - billId : String
+    - consultationFee : BigDecimal
+    - treatmentCost : BigDecimal
+    - discount : BigDecimal
+    - taxAmount : BigDecimal
+    - totalAmount : BigDecimal
+    - paymentStatus : PaymentStatus
+    - issuedDate : LocalDateTime
+    + calculateTotal() : BigDecimal
+    + generatePDF() : File
+  }
+}
+
+package "Enumerations" {
+  enum Role #D5F0EC {
+    ADMINISTRATOR
+    RECEPTIONIST
+    DENTIST
+  }
+  enum AppointmentStatus #D5F0EC {
+    SCHEDULED
+    COMPLETED
+    CANCELLED
+    NO_SHOW
+  }
+  enum PaymentStatus #D5F0EC {
+    PENDING
+    PAID
+    REFUNDED
+  }
+}
+
+package "Service Layer" {
+  interface IAppointmentService #D5F0EC {
+    + book(dto) : Appointment
+    + findByNo(no : String) : Appointment
+    + isSlotFree(d, t, dentist) : boolean
+    + cancel(no : String) : boolean
+  }
+
+  class AppointmentServiceImpl {
+    - repo : AppointmentRepository
+    - observers : List<IObserver>
+    + book(dto) : Appointment
+    + isSlotFree(d, t, dentist) : boolean
+  }
+
+  class BillingService {
+    - strategy : IBillingStrategy
+    + setStrategy(s : IBillingStrategy) : void
+    + generateBill(apt) : Bill
+  }
+
+  class AuthenticationService {
+    - MAX_ATTEMPTS : int = 3
+    + authenticate(u, p) : String
+    + hashPassword(p) : String
+  }
+}
+
+package "Design Patterns" {
+  interface IBillingStrategy #D5F0EC {
+    + calculate(apt : Appointment) : BigDecimal
+  }
+  class StandardBilling {
+    + calculate(apt) : BigDecimal
+  }
+  class SeniorCitizenBilling {
+    - DISCOUNT : double = 0.10
+    + calculate(apt) : BigDecimal
+  }
+  class InsuranceBilling {
+    - coverage : double
+    + calculate(apt) : BigDecimal
+  }
+
+  class TreatmentFactory <<Factory>> #FDF2E3 {
+    + {static} create(type : String) : Treatment
+  }
+
+  class DBConnectionManager <<Singleton>> #FDF2E3 {
+    - {static} instance : DBConnectionManager
+    - DBConnectionManager()
+    + {static} getInstance() : DBConnectionManager
+    + getConnection() : Connection
+  }
+
+  class AppointmentBuilder <<Builder>> #FDF2E3 {
+    + withPatient(p) : AppointmentBuilder
+    + withDentist(d) : AppointmentBuilder
+    + withTreatment(t) : AppointmentBuilder
+    + withDateTime(d, t) : AppointmentBuilder
+    + build() : Appointment
+  }
+
+  interface IObserver #D5F0EC {
+    + update(apt : Appointment) : void
+  }
+  class NotificationObserver {
+    + update(apt : Appointment) : void
+  }
+}
+
+package "Data Access (DAO)" {
+  interface IRepository<T> #D5F0EC {
+    + save(entity : T) : T
+    + findById(id) : Optional<T>
+    + findAll() : List<T>
+    + delete(id) : void
+  }
+  class AppointmentRepository
+  class PatientRepository
+  class BillRepository
+}
+
+' ---------- Inheritance ----------
+User <|-- Administrator
+User <|-- Receptionist
+User <|-- Dentist
+
+IBillingStrategy <|.. StandardBilling
+IBillingStrategy <|.. SeniorCitizenBilling
+IBillingStrategy <|.. InsuranceBilling
+IAppointmentService <|.. AppointmentServiceImpl
+IObserver <|.. NotificationObserver
+IRepository <|.. AppointmentRepository
+IRepository <|.. PatientRepository
+IRepository <|.. BillRepository
+
+' ---------- Associations ----------
+Patient "1" -- "0..*" Appointment : books >
+Dentist "1" -- "0..*" Appointment : attends >
+Appointment "0..*" -- "1" Treatment : requires >
+Appointment "1" *-- "0..1" Bill : generates >
+User "1" -- "1" Role : has >
+Appointment "1" -- "1" AppointmentStatus
+Bill "1" -- "1" PaymentStatus
+
+' ---------- Dependencies ----------
+AppointmentServiceImpl ..> AppointmentRepository : uses
+AppointmentServiceImpl ..> AppointmentBuilder : uses
+AppointmentServiceImpl o-- IObserver : notifies
+BillingService o-- IBillingStrategy : uses
+BillingService ..> BillRepository : uses
+AuthenticationService ..> User : validates
+TreatmentFactory ..> Treatment : creates
+AppointmentBuilder ..> Appointment : constructs
+AppointmentRepository ..> DBConnectionManager : uses
+
+note top of IBillingStrategy #FDF2E3
+  <b>Strategy Pattern</b>
+  Billing rules change frequently.
+  Algorithms are swapped at runtime
+  without modifying BillingService.
+end note
+
+note bottom of User #FDF2E3
+  <b>Assumption:</b> User is abstract.
+  Role-specific permissions are
+  resolved polymorphically.
+end note
+
+@enduml
