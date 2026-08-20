@@ -20,3 +20,8 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+
+CLAUDE.md
+claude-code-prompts.md
+development-plan.md
