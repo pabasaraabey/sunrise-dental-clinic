@@ -1,0 +1,9 @@
+# Copy this file to db.properties and fill in your own credentials.
+# db.properties is gitignored and must never be committed.
+
+db.url=jdbc:mysql://localhost:3306/sdcms_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Colombo
+db.user=root
+db.password=CHANGE_ME
+
+db.pool.maxSize=10
+db.pool.minIdle=2
