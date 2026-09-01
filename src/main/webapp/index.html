@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard — Sunrise Dental Clinic</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="shell">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+        <h1 class="page-title">Today at the clinic</h1>
+        <p class="page-lede" id="todayLabel"></p>
+
+        <div id="notice" class="notice"></div>
+
+        <section class="panel">
+            <h2>Appointment schedule</h2>
+            <div class="panel-body" style="padding:0">
+                <div id="scheduleArea">
+                    <p class="empty">Loading today's schedule…</p>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+(async () => {
+    const user = await Ui.requireSession();
+    Ui.renderShell(user, 'index.html');
+
+    document.getElementById('todayLabel').textContent =
+        new Date().toLocaleDateString('en-GB',
+            { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    try {
+        const appointments = await Api.appointmentsOn(Ui.today());
+        const area = document.getElementById('scheduleArea');
+
+        if (!appointments.length) {
+            area.innerHTML =
+                '<p class="empty">No appointments booked for today.<br>'
+                + '<a href="booking.html">Book the first one</a></p>';
+            return;
+        }
+
+        area.innerHTML =
+            '<table><thead><tr>'
+            + '<th>Time</th><th>Appointment</th><th>Patient</th>'
+            + '<th>Dentist</th><th>Treatment</th><th>Status</th>'
+            + '</tr></thead><tbody>'
+            + appointments.map(a =>
+                '<tr>'
+                + '<td class="tabular">' + Ui.escape(a.appointmentTime) + '</td>'
+                + '<td class="tabular">' + Ui.escape(a.appointmentNo) + '</td>'
+                + '<td>' + Ui.escape(a.patientName) + '</td>'
+                + '<td>' + Ui.escape(a.dentistName) + '</td>'
+                + '<td>' + Ui.escape(a.treatmentName) + '</td>'
+                + '<td><span class="pill ' + a.status.toLowerCase() + '">'
+                + Ui.escape(a.status.replace('_', ' ')) + '</span></td>'
+                + '</tr>').join('')
+            + '</tbody></table>';
+
+    } catch (error) {
+        Ui.notice('notice', 'error', error.message);
+        document.getElementById('scheduleArea').innerHTML =
+            '<p class="empty">The schedule could not be loaded.</p>';
+    }
+})();
+</script>
+
+</body>
+</html>

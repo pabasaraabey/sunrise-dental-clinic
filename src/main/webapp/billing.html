@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Billing — Sunrise Dental Clinic</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="shell">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+        <h1 class="page-title">Billing</h1>
+        <p class="page-lede">
+            Generate a bill for a completed visit. The consultation fee is added
+            automatically, and patients aged 65 or over receive the concession.
+        </p>
+
+        <div id="notice" class="notice"></div>
+
+        <section class="panel">
+            <h2>Find the appointment</h2>
+            <div class="panel-body">
+                <form id="billForm" autocomplete="off">
+                    <div class="row">
+                        <div class="field">
+                            <label for="appointmentNo">Appointment number</label>
+                            <input type="text" id="appointmentNo"
+                                   placeholder="APT-20260821-0001">
+                            <div class="field-error"></div>
+                        </div>
+                        <div class="field" style="align-self:end">
+                            <button type="submit">Look up</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="panel" id="visitPanel" style="display:none">
+            <h2>Visit</h2>
+            <div class="panel-body" id="visitBody"></div>
+        </section>
+
+        <section class="panel" id="billPanel" style="display:none">
+            <h2>Bill</h2>
+            <div class="panel-body" id="billBody"></div>
+        </section>
+    </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/validators.js"></script>
+<script>
+let appointment = null;
+
+(async () => {
+    const user = await Ui.requireSession();
+    Ui.renderShell(user, 'billing.html');
+
+    // Arriving from the search page carries the appointment number across,
+    // so the receptionist does not retype it.
+    const preset = new URLSearchParams(window.location.search).get('no');
+    if (preset) {
+        document.getElementById('appointmentNo').value = preset;
+        lookUp(preset);
+    }
+})();
+
+document.getElementById('billForm').addEventListener('submit', (event) => {
+    event.preventDefault();
+    Validate.clearAll('billForm');
+    if (!Validate.required('appointmentNo', 'Appointment number')) return;
+    lookUp(document.getElementById('appointmentNo').value.trim());
+});
+
+async function lookUp(appointmentNo) {
+    Ui.clearNotice('notice');
+    document.getElementById('billPanel').style.display = 'none';
+
+    try {
+        appointment = await Api.findAppointment(appointmentNo);
+        showVisit();
+
+        // An existing bill is shown rather than silently offering to make a
+        // second one, which the server would refuse anyway.
+        try {
+            const existing = await Api.findBill(appointmentNo);
+            showBill(existing, true);
+        } catch (e) {
+            if (e.status !== 404) throw e;
+        }
+
+    } catch (error) {
+        document.getElementById('visitPanel').style.display = 'none';
+        if (error.status === 404) {
+            Ui.notice('notice', 'warn', 'No appointment found with that number.');
+        } else {
+            Ui.notice('notice', 'error', error.message);
+        }
+    }
+}
+
+function showVisit() {
+    const a = appointment;
+    const senior = a.patientAge >= 65;
+
+    document.getElementById('visitBody').innerHTML =
+        '<dl class="detail-grid">'
+        + '<dt>Patient</dt><dd>' + Ui.escape(a.patientName)
+        + ' <span style="color:var(--ink-faint)">(age ' + a.patientAge + ')</span>'
+        + (senior ? ' <span class="pill completed">senior concession</span>' : '')
+        + '</dd>'
+        + '<dt>Dentist</dt><dd>' + Ui.escape(a.dentistName) + '</dd>'
+        + '<dt>Treatment</dt><dd>' + Ui.escape(a.treatmentName) + '</dd>'
+        + '<dt>Visit</dt><dd class="tabular">' + Ui.escape(a.appointmentDate)
+        + ' at ' + Ui.escape(a.appointmentTime) + '</dd>'
+        + '<dt>Status</dt><dd><span class="pill ' + a.status.toLowerCase() + '">'
+        + Ui.escape(a.status.replace('_', ' ')) + '</span></dd>'
+        + '</dl>'
+        + (a.status === 'CANCELLED'
+            ? '<p class="hint" style="margin-top:14px">'
+              + 'A cancelled appointment cannot be billed.</p>'
+            : '<div class="actions" style="margin-top:16px">'
+              + '<button id="generateBtn" onclick="generate()">Generate bill</button>'
+              + '</div>');
+
+    document.getElementById('visitPanel').style.display = '';
+}
+
+async function generate() {
+    Ui.clearNotice('notice');
+    const button = document.getElementById('generateBtn');
+    button.disabled = true;
+    button.textContent = 'Generating…';
+
+    try {
+        const bill = await Api.generateBill(appointment.appointmentNo);
+        Ui.notice('notice', 'ok', 'Bill ' + bill.billId + ' issued.');
+        showBill(bill, false);
+
+    } catch (error) {
+        if (error.status === 409) {
+            Ui.notice('notice', 'warn', error.message);
+        } else {
+            Ui.notice('notice', 'error', error.message);
+        }
+    } finally {
+        button.disabled = false;
+        button.textContent = 'Generate bill';
+    }
+}
+
+function showBill(bill, existing) {
+    const discount = Number(bill.discountAmount || 0);
+
+    document.getElementById('billBody').innerHTML =
+        (existing ? '<p class="hint" style="margin-bottom:14px">'
+                    + 'A bill has already been issued for this visit.</p>' : '')
+        + '<dl class="detail-grid" style="margin-bottom:18px">'
+        + '<dt>Bill number</dt><dd class="tabular">' + Ui.escape(bill.billId) + '</dd>'
+        + '<dt>Rule applied</dt><dd>' + Ui.escape(bill.appliedRule) + '</dd>'
+        + '<dt>Payment</dt><dd><span class="pill ' + bill.paymentStatus.toLowerCase()
+        + '">' + Ui.escape(bill.paymentStatus) + '</span></dd>'
+        + '</dl>'
+        + '<table class="bill-lines">'
+        + line('Consultation fee', bill.consultationFee)
+        + line('Treatment charge', bill.treatmentCost)
+        + (discount > 0
+            ? '<tr class="discount"><td>' + Ui.escape(bill.appliedRule)
+              + '</td><td>− ' + Ui.money(discount) + '</td></tr>'
+            : '')
+        + line('VAT (8%)', bill.taxAmount)
+        + '<tr class="total"><td>Total payable</td><td>LKR '
+        + Ui.money(bill.totalAmount) + '</td></tr>'
+        + '</table>'
+        + '<div class="actions" style="margin-top:18px">'
+        + '<button onclick="window.open(\'api/bills/pdf?id='
+        + encodeURIComponent(bill.billId) + '\',\'_blank\')">Print receipt</button>'
+        + '</div>';
+
+    document.getElementById('billPanel').style.display = '';
+    document.getElementById('billPanel').scrollIntoView({ behavior: 'smooth' });
+}
+
+function line(label, amount) {
+    return '<tr><td>' + label + '</td><td>' + Ui.money(amount) + '</td></tr>';
+}
+</script>
+
+</body>
+</html>

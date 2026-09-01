@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Help — Sunrise Dental Clinic</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="shell">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+        <h1 class="page-title">How to use this system</h1>
+        <p class="page-lede">A short guide for staff who are new to the clinic.</p>
+
+        <section class="panel">
+            <h2>Booking an appointment</h2>
+            <div class="panel-body">
+
+                <div class="help-step">
+                    <div class="n">1</div>
+                    <div>
+                        <h3>Open New appointment</h3>
+                        <p>Choose <strong>New appointment</strong> from the menu on the left.</p>
+                    </div>
+                </div>
+
+                <div class="help-step">
+                    <div class="n">2</div>
+                    <div>
+                        <h3>Enter the patient's details</h3>
+                        <p>Type the contact number carefully — it is how the system
+                        recognises returning patients. If the number is already
+                        registered, the existing record is reused and no duplicate
+                        is created.</p>
+                    </div>
+                </div>
+
+                <div class="help-step">
+                    <div class="n">3</div>
+                    <div>
+                        <h3>Choose a dentist, treatment and date</h3>
+                        <p>The system shows each dentist's working hours and the cost
+                        of the selected treatment.</p>
+                    </div>
+                </div>
+
+                <div class="help-step">
+                    <div class="n">4</div>
+                    <div>
+                        <h3>Pick a free slot</h3>
+                        <p>Free slots are selectable. Slots already booked appear
+                        greyed out and struck through, so you can see the whole shape
+                        of the dentist's day at a glance.</p>
+                    </div>
+                </div>
+
+                <div class="help-step">
+                    <div class="n">5</div>
+                    <div>
+                        <h3>Book</h3>
+                        <p>The system generates the appointment number and shows it
+                        on screen. Write it on the patient's card — it is how the
+                        visit is found later.</p>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Producing a bill</h2>
+            <div class="panel-body">
+
+                <div class="help-step">
+                    <div class="n">1</div>
+                    <div>
+                        <h3>Open Billing and enter the appointment number</h3>
+                        <p>The visit details appear so you can confirm you have the
+                        right patient before charging anything.</p>
+                    </div>
+                </div>
+
+                <div class="help-step">
+                    <div class="n">2</div>
+                    <div>
+                        <h3>Generate the bill</h3>
+                        <p>The consultation fee is added automatically and VAT is
+                        calculated for you. Patients aged 65 or over receive the
+                        senior concession without you needing to apply it.</p>
+                    </div>
+                </div>
+
+                <div class="help-step">
+                    <div class="n">3</div>
+                    <div>
+                        <h3>Print the receipt</h3>
+                        <p>Opens as a PDF in a new tab, ready to print. Each visit
+                        can be billed only once.</p>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Questions staff often ask</h2>
+            <div class="panel-body">
+
+                <div class="help-step">
+                    <div class="n">?</div>
+                    <div>
+                        <h3>The slot I wanted turned grey while I was typing</h3>
+                        <p>Another receptionist booked it first. The system prevents
+                        two patients being given the same slot, so choose another
+                        time and book again.</p>
+                    </div>
+                </div>
+
+                <div class="help-step">
+                    <div class="n">?</div>
+                    <div>
+                        <h3>I cannot cancel an appointment</h3>
+                        <p>Cancellation closes two hours before the appointment, so
+                        the clinic has a chance to offer the slot to someone else.
+                        Speak to the administrator if it needs cancelling anyway.</p>
+                    </div>
+                </div>
+
+                <div class="help-step">
+                    <div class="n">?</div>
+                    <div>
+                        <h3>My account is locked</h3>
+                        <p>Three wrong passwords in a row lock an account for fifteen
+                        minutes. Wait, then try again.</p>
+                    </div>
+                </div>
+
+                <div class="help-step">
+                    <div class="n">?</div>
+                    <div>
+                        <h3>A menu option is missing</h3>
+                        <p>You only see what your role allows. Receptionists handle
+                        bookings and billing; dentists see schedules and patient
+                        history; administrators manage staff, prices and reports.</p>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+    </main>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+(async () => {
+    const user = await Ui.requireSession();
+    Ui.renderShell(user, 'help.html');
+})();
+</script>
+
+</body>
+</html>

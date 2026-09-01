@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in — Sunrise Dental Clinic</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body class="login-page">
+
+<div class="login-card">
+    <h1>Sunrise Dental</h1>
+    <p class="subtitle">Clinic management system</p>
+
+    <div id="notice" class="notice"></div>
+
+    <form id="loginForm" autocomplete="off">
+        <div class="field">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" autofocus>
+            <div class="field-error"></div>
+        </div>
+
+        <div class="field">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password">
+            <div class="field-error"></div>
+        </div>
+
+        <button type="submit" class="btn-block" id="signInBtn">Sign in</button>
+    </form>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/validators.js"></script>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    Ui.clearNotice('notice');
+    Validate.clearAll('loginForm');
+
+    const okUser = Validate.required('username', 'Username');
+    const okPass = Validate.required('password', 'Password');
+    if (!okUser || !okPass) return;
+
+    const button = document.getElementById('signInBtn');
+    button.disabled = true;
+    button.textContent = 'Signing in…';
+
+    try {
+        await Api.login(
+            document.getElementById('username').value.trim(),
+            document.getElementById('password').value);
+
+        window.location.href = 'index.html';
+
+    } catch (error) {
+        // The server returns one message for both an unknown username and a
+        // wrong password, so nothing here reveals which it was.
+        Ui.notice('notice', 'error', error.message);
+        document.getElementById('password').value = '';
+        document.getElementById('password').focus();
+
+    } finally {
+        button.disabled = false;
+        button.textContent = 'Sign in';
+    }
+});
+</script>
+
+</body>
+</html>

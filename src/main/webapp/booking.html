@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New appointment — Sunrise Dental Clinic</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="shell">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+        <h1 class="page-title">New appointment</h1>
+        <p class="page-lede">
+            Enter the patient's details and choose a free slot. If the contact
+            number is already registered, the existing patient record is reused.
+        </p>
+
+        <div id="notice" class="notice"></div>
+
+        <form id="bookingForm" autocomplete="off">
+
+            <section class="panel">
+                <h2>Patient</h2>
+                <div class="panel-body">
+
+                    <div class="row">
+                        <div class="field">
+                            <label for="patientName">Full name <span class="req">*</span></label>
+                            <input type="text" id="patientName">
+                            <div class="field-error"></div>
+                        </div>
+
+                        <div class="field">
+                            <label for="contactNo">Contact number <span class="req">*</span></label>
+                            <input type="tel" id="contactNo" placeholder="0771234567" maxlength="10">
+                            <div class="field-error"></div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="address">Address <span class="req">*</span></label>
+                        <input type="text" id="address">
+                        <div class="field-error"></div>
+                    </div>
+
+                    <div class="row-3">
+                        <div class="field">
+                            <label for="dateOfBirth">Date of birth <span class="req">*</span></label>
+                            <input type="date" id="dateOfBirth">
+                            <div class="field-error"></div>
+                            <p class="hint" id="ageHint"></p>
+                        </div>
+
+                        <div class="field">
+                            <label for="gender">Gender</label>
+                            <select id="gender">
+                                <option value="MALE">Male</option>
+                                <option value="FEMALE">Female</option>
+                                <option value="OTHER">Other</option>
+                            </select>
+                            <div class="field-error"></div>
+                        </div>
+
+                        <div class="field">
+                            <label for="email">Email</label>
+                            <input type="email" id="email">
+                            <div class="field-error"></div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>Appointment</h2>
+                <div class="panel-body">
+
+                    <div class="row-3">
+                        <div class="field">
+                            <label for="dentistId">Dentist <span class="req">*</span></label>
+                            <select id="dentistId">
+                                <option value="">Choose a dentist…</option>
+                            </select>
+                            <div class="field-error"></div>
+                            <p class="hint" id="dentistHours"></p>
+                        </div>
+
+                        <div class="field">
+                            <label for="treatmentId">Treatment <span class="req">*</span></label>
+                            <select id="treatmentId">
+                                <option value="">Choose a treatment…</option>
+                            </select>
+                            <div class="field-error"></div>
+                            <p class="hint" id="treatmentCost"></p>
+                        </div>
+
+                        <div class="field">
+                            <label for="appointmentDate">Date <span class="req">*</span></label>
+                            <input type="date" id="appointmentDate">
+                            <div class="field-error"></div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>Time <span class="req">*</span></label>
+                        <div id="slotArea">
+                            <p class="empty" style="padding:24px 8px">
+                                Choose a dentist and a date to see free slots.
+                            </p>
+                        </div>
+                        <input type="hidden" id="appointmentTime">
+                        <div class="slot-legend">
+                            <span><i class="swatch free"></i> Free</span>
+                            <span><i class="swatch taken"></i> Already booked</span>
+                            <span><i class="swatch sel"></i> Selected</span>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="notes">Notes</label>
+                        <textarea id="notes" rows="2"></textarea>
+                        <div class="field-error"></div>
+                    </div>
+
+                    <div class="actions">
+                        <button type="submit" id="bookBtn">Book appointment</button>
+                        <button type="button" class="btn-secondary"
+                                onclick="window.location.href='index.html'">Cancel</button>
+                    </div>
+
+                </div>
+            </section>
+        </form>
+    </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/validators.js"></script>
+<script>
+let dentists = [];
+let treatments = [];
+
+(async () => {
+    const user = await Ui.requireSession();
+    Ui.renderShell(user, 'booking.html');
+
+    // Bound the date picker in the control itself as well as in validation —
+    // stopping an invalid choice is better than reporting it afterwards.
+    const dateField = document.getElementById('appointmentDate');
+    dateField.min = Ui.today();
+    const limit = new Date();
+    limit.setDate(limit.getDate() + 90);
+    dateField.max = limit.toISOString().slice(0, 10);
+    dateField.value = Ui.today();
+
+    document.getElementById('dateOfBirth').max = Ui.today();
+
+    try {
+        const reference = await Api.reference();
+        dentists = reference.dentists;
+        treatments = reference.treatments;
+
+        document.getElementById('dentistId').innerHTML =
+            '<option value="">Choose a dentist…</option>'
+            + dentists.map(d => '<option value="' + d.dentistId + '">'
+                + Ui.escape(d.name) + ' — ' + Ui.escape(d.specialization)
+                + '</option>').join('');
+
+        document.getElementById('treatmentId').innerHTML =
+            '<option value="">Choose a treatment…</option>'
+            + treatments.map(t => '<option value="' + t.treatmentId + '">'
+                + Ui.escape(t.name) + '</option>').join('');
+
+    } catch (error) {
+        Ui.notice('notice', 'error', 'Could not load dentists and treatments: '
+            + error.message);
+    }
+})();
+
+/* ---------------------------------------------------------------
+   Slot grid
+   Free slots come from the server, which knows what is already
+   booked. Showing taken slots struck through rather than omitting
+   them lets the receptionist see the shape of the dentist's day.
+   --------------------------------------------------------------- */
+
+async function refreshSlots() {
+    const dentistId = document.getElementById('dentistId').value;
+    const date = document.getElementById('appointmentDate').value;
+    const area = document.getElementById('slotArea');
+
+    document.getElementById('appointmentTime').value = '';
+
+    if (!dentistId || !date) {
+        area.innerHTML = '<p class="empty" style="padding:24px 8px">'
+            + 'Choose a dentist and a date to see free slots.</p>';
+        return;
+    }
+
+    area.innerHTML = '<p class="empty" style="padding:24px 8px">Checking availability…</p>';
+
+    try {
+        const free = await Api.availability(dentistId, date);
+        const dentist = dentists.find(d => String(d.dentistId) === String(dentistId));
+
+        const all = [];
+        const [fromH, fromM] = dentist.availableFrom.split(':').map(Number);
+        const [toH, toM] = dentist.availableTo.split(':').map(Number);
+
+        for (let mins = fromH * 60 + fromM; mins < toH * 60 + toM; mins += 30) {
+            all.push(String(Math.floor(mins / 60)).padStart(2, '0')
+                + ':' + String(mins % 60).padStart(2, '0'));
+        }
+
+        if (!all.length) {
+            area.innerHTML = '<p class="empty">This dentist has no hours set.</p>';
+            return;
+        }
+
+        area.innerHTML = '<div class="slot-grid">'
+            + all.map(slot => {
+                const isFree = free.includes(slot);
+                return '<div class="slot' + (isFree ? '' : ' taken') + '"'
+                    + (isFree ? ' onclick="chooseSlot(this,\'' + slot + '\')"'
+                              : ' title="Already booked"')
+                    + '>' + slot + '</div>';
+            }).join('')
+            + '</div>';
+
+        if (!free.length) {
+            Ui.notice('notice', 'warn',
+                'This dentist is fully booked on that date. Try another day or dentist.');
+        } else {
+            Ui.clearNotice('notice');
+        }
+
+    } catch (error) {
+        area.innerHTML = '<p class="empty">Availability could not be checked.</p>';
+        Ui.notice('notice', 'error', error.message);
+    }
+}
+
+function chooseSlot(element, time) {
+    document.querySelectorAll('.slot.selected')
+        .forEach(s => s.classList.remove('selected'));
+    element.classList.add('selected');
+    document.getElementById('appointmentTime').value = time;
+    document.querySelector('#slotArea').closest('.field').classList.remove('invalid');
+}
+
+document.getElementById('dentistId').addEventListener('change', (e) => {
+    const dentist = dentists.find(d => String(d.dentistId) === e.target.value);
+    document.getElementById('dentistHours').textContent =
+        dentist ? 'Works ' + dentist.availableFrom + ' to ' + dentist.availableTo : '';
+    refreshSlots();
+});
+
+document.getElementById('appointmentDate').addEventListener('change', refreshSlots);
+
+document.getElementById('treatmentId').addEventListener('change', (e) => {
+    const treatment = treatments.find(t => String(t.treatmentId) === e.target.value);
+    document.getElementById('treatmentCost').textContent = treatment
+        ? 'LKR ' + Ui.money(treatment.baseCost) + ' · ' + treatment.durationMinutes + ' min'
+        : '';
+});
+
+/* Shows the age as the receptionist types, so the senior concession is
+   visible before the bill rather than as a surprise on it. */
+document.getElementById('dateOfBirth').addEventListener('change', (e) => {
+    const hint = document.getElementById('ageHint');
+    if (!e.target.value) { hint.textContent = ''; return; }
+
+    const born = new Date(e.target.value);
+    let age = new Date().getFullYear() - born.getFullYear();
+    const monthDiff = new Date().getMonth() - born.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && new Date().getDate() < born.getDate())) age--;
+
+    hint.textContent = 'Age ' + age
+        + (age >= 65 ? ' — senior concession applies' : '');
+});
+
+/* ---------------------------------------------------------------
+   Submit
+   --------------------------------------------------------------- */
+
+document.getElementById('bookingForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    Ui.clearNotice('notice');
+    Validate.clearAll('bookingForm');
+
+    // Every check is evaluated rather than short-circuited, so the
+    // receptionist sees all the problems at once instead of fixing
+    // them one submission at a time.
+    const checks = [
+        Validate.required('patientName', 'Patient name'),
+        Validate.contactNo('contactNo'),
+        Validate.required('address', 'Address'),
+        Validate.dateOfBirth('dateOfBirth'),
+        Validate.emailIfPresent('email'),
+        Validate.selected('dentistId', 'dentist'),
+        Validate.selected('treatmentId', 'treatment'),
+        Validate.appointmentDate('appointmentDate')
+    ];
+
+    const time = document.getElementById('appointmentTime').value;
+    if (!time) {
+        document.querySelector('#slotArea').closest('.field').classList.add('invalid');
+        Ui.notice('notice', 'error', 'Choose a time slot before booking.');
+        checks.push(false);
+    }
+
+    if (checks.includes(false)) return;
+
+    const button = document.getElementById('bookBtn');
+    button.disabled = true;
+    button.textContent = 'Booking…';
+
+    try {
+        const result = await Api.bookAppointment({
+            patientName:     document.getElementById('patientName').value.trim(),
+            address:         document.getElementById('address').value.trim(),
+            contactNo:       document.getElementById('contactNo').value.trim(),
+            email:           document.getElementById('email').value.trim() || null,
+            dateOfBirth:     document.getElementById('dateOfBirth').value,
+            gender:          document.getElementById('gender').value,
+            dentistId:       Number(document.getElementById('dentistId').value),
+            treatmentId:     Number(document.getElementById('treatmentId').value),
+            appointmentDate: document.getElementById('appointmentDate').value,
+            appointmentTime: time,
+            notes:           document.getElementById('notes').value.trim() || null
+        });
+
+        Ui.notice('notice', 'ok',
+            'Booked. Appointment number ' + result.appointmentNo
+            + ' for ' + result.patientName + ' at ' + result.appointmentTime + '.');
+
+        document.getElementById('bookingForm').reset();
+        document.getElementById('appointmentTime').value = '';
+        document.getElementById('ageHint').textContent = '';
+        document.getElementById('treatmentCost').textContent = '';
+        document.getElementById('slotArea').innerHTML =
+            '<p class="empty" style="padding:24px 8px">'
+            + 'Choose a dentist and a date to see free slots.</p>';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    } catch (error) {
+        if (error.status === 409) {
+            // Someone else took the slot between this page loading and the
+            // form being submitted. Client validation cannot prevent this —
+            // only the database constraint catches it — so the page has to
+            // recover gracefully rather than treat it as a bug.
+            Ui.notice('notice', 'warn',
+                'That slot was taken while you were filling in the form. '
+                + 'Please choose another time.');
+            refreshSlots();
+
+        } else {
+            Ui.notice('notice', 'error', error.message);
+        }
+
+    } finally {
+        button.disabled = false;
+        button.textContent = 'Book appointment';
+    }
+});
+</script>
+
+</body>
+</html>

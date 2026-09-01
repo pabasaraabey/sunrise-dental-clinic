@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Find appointment — Sunrise Dental Clinic</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="shell">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+        <h1 class="page-title">Find an appointment</h1>
+        <p class="page-lede">Search by appointment number, or browse a day's bookings.</p>
+
+        <div id="notice" class="notice"></div>
+
+        <section class="panel">
+            <h2>Search</h2>
+            <div class="panel-body">
+                <form id="searchForm" autocomplete="off">
+                    <div class="row">
+                        <div class="field">
+                            <label for="appointmentNo">Appointment number</label>
+                            <input type="text" id="appointmentNo"
+                                   placeholder="APT-20260821-0001">
+                            <div class="field-error"></div>
+                        </div>
+                        <div class="field" style="align-self:end">
+                            <div class="actions">
+                                <button type="submit">Search</button>
+                                <button type="button" class="btn-secondary"
+                                        onclick="browseToday()">Today's bookings</button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="panel" id="resultPanel" style="display:none">
+            <h2>Appointment details</h2>
+            <div class="panel-body" id="resultBody"></div>
+        </section>
+
+        <section class="panel" id="listPanel" style="display:none">
+            <h2>Bookings</h2>
+            <div class="panel-body" style="padding:0" id="listBody"></div>
+        </section>
+    </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/validators.js"></script>
+<script>
+let currentUser = null;
+
+(async () => {
+    currentUser = await Ui.requireSession();
+    Ui.renderShell(currentUser, 'search.html');
+})();
+
+document.getElementById('searchForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    Ui.clearNotice('notice');
+    Validate.clearAll('searchForm');
+
+    if (!Validate.required('appointmentNo', 'Appointment number')) return;
+
+    document.getElementById('listPanel').style.display = 'none';
+
+    try {
+        const a = await Api.findAppointment(
+            document.getElementById('appointmentNo').value.trim());
+        showAppointment(a);
+
+    } catch (error) {
+        document.getElementById('resultPanel').style.display = 'none';
+        if (error.status === 404) {
+            Ui.notice('notice', 'warn',
+                'No appointment found with that number. Check the number and try again.');
+        } else {
+            Ui.notice('notice', 'error', error.message);
+        }
+    }
+});
+
+function showAppointment(a) {
+    const canCancel = a.cancellable
+        && ['ADMINISTRATOR', 'RECEPTIONIST'].includes(currentUser.role);
+
+    document.getElementById('resultBody').innerHTML =
+        '<dl class="detail-grid">'
+        + row('Appointment', '<span class="tabular">' + Ui.escape(a.appointmentNo) + '</span>')
+        + row('Status', '<span class="pill ' + a.status.toLowerCase() + '">'
+              + Ui.escape(a.status.replace('_', ' ')) + '</span>')
+        + row('Patient', Ui.escape(a.patientName)
+              + ' <span style="color:var(--ink-faint)">(age ' + a.patientAge + ')</span>')
+        + row('Contact', '<span class="tabular">' + Ui.escape(a.contactNo) + '</span>')
+        + row('Address', Ui.escape(a.address))
+        + row('Dentist', Ui.escape(a.dentistName) + ' — ' + Ui.escape(a.specialization))
+        + row('Treatment', Ui.escape(a.treatmentName)
+              + ' <span style="color:var(--ink-faint)">LKR '
+              + Ui.money(a.treatmentCost) + '</span>')
+        + row('Date and time', '<span class="tabular">' + Ui.escape(a.appointmentDate)
+              + ' at ' + Ui.escape(a.appointmentTime) + '</span>')
+        + (a.notes ? row('Notes', Ui.escape(a.notes)) : '')
+        + '</dl>'
+        + '<div class="actions" style="margin-top:16px">'
+        + (['ADMINISTRATOR','RECEPTIONIST'].includes(currentUser.role)
+            ? '<button onclick="window.location.href=\'billing.html?no='
+              + encodeURIComponent(a.appointmentNo) + '\'">Go to billing</button>' : '')
+        + (canCancel
+            ? '<button class="btn-secondary" onclick="cancelBooking(\''
+              + a.appointmentNo + '\')">Cancel appointment</button>'
+            : '')
+        + '</div>'
+        + (a.status === 'SCHEDULED' && !a.cancellable
+            ? '<p class="hint" style="margin-top:10px">This appointment is within two '
+              + 'hours of its scheduled time and can no longer be cancelled.</p>'
+            : '');
+
+    document.getElementById('resultPanel').style.display = '';
+}
+
+function row(label, value) {
+    return '<dt>' + label + '</dt><dd>' + value + '</dd>';
+}
+
+async function cancelBooking(appointmentNo) {
+    if (!confirm('Cancel appointment ' + appointmentNo + '?')) return;
+    Ui.clearNotice('notice');
+
+    try {
+        const updated = await Api.cancelAppointment(appointmentNo);
+        Ui.notice('notice', 'ok', appointmentNo + ' has been cancelled. The slot is free again.');
+        showAppointment(updated);
+
+    } catch (error) {
+        // 422 means the request was fine but a rule forbids it — here, the
+        // two-hour cutoff. Distinct from a 400, and the message differs.
+        if (error.status === 422) {
+            Ui.notice('notice', 'warn', error.message);
+        } else {
+            Ui.notice('notice', 'error', error.message);
+        }
+    }
+}
+
+async function browseToday() {
+    Ui.clearNotice('notice');
+    document.getElementById('resultPanel').style.display = 'none';
+
+    try {
+        const list = await Api.appointmentsOn(Ui.today());
+        const body = document.getElementById('listBody');
+
+        if (!list.length) {
+            body.innerHTML = '<p class="empty">No appointments booked for today.</p>';
+        } else {
+            body.innerHTML = '<table><thead><tr>'
+                + '<th>Time</th><th>Appointment</th><th>Patient</th>'
+                + '<th>Dentist</th><th>Status</th><th></th>'
+                + '</tr></thead><tbody>'
+                + list.map(a => '<tr>'
+                    + '<td class="tabular">' + Ui.escape(a.appointmentTime) + '</td>'
+                    + '<td class="tabular">' + Ui.escape(a.appointmentNo) + '</td>'
+                    + '<td>' + Ui.escape(a.patientName) + '</td>'
+                    + '<td>' + Ui.escape(a.dentistName) + '</td>'
+                    + '<td><span class="pill ' + a.status.toLowerCase() + '">'
+                    + Ui.escape(a.status.replace('_', ' ')) + '</span></td>'
+                    + '<td><a href="#" onclick="openOne(\'' + a.appointmentNo
+                    + '\');return false;">View</a></td>'
+                    + '</tr>').join('')
+                + '</tbody></table>';
+        }
+        document.getElementById('listPanel').style.display = '';
+
+    } catch (error) {
+        Ui.notice('notice', 'error', error.message);
+    }
+}
+
+async function openOne(no) {
+    document.getElementById('appointmentNo').value = no;
+    const a = await Api.findAppointment(no);
+    showAppointment(a);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+
+</body>
+</html>

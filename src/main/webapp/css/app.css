@@ -1,0 +1,598 @@
+/* =====================================================================
+   Sunrise Dental Clinic Management System
+   Interface stylesheet
+
+   Palette is shared with the system's UML documentation so the report and
+   the running application read as one piece of work.
+   ===================================================================== */
+
+:root {
+    /* Colour */
+    --ink:            #16232E;
+    --ink-soft:       #55636E;
+    --ink-faint:      #8A97A1;
+
+    --brand:          #1B4F72;
+    --brand-dark:     #143D59;
+    --brand-tint:     #EAF2F8;
+
+    --accent:         #D5F0EC;
+    --accent-line:    #4FA89B;
+
+    --warn:           #FDF2E3;
+    --warn-line:      #C08A2E;
+
+    --danger:         #B3261E;
+    --danger-tint:    #FCEBEA;
+
+    --surface:        #FFFFFF;
+    --canvas:         #F5F7F9;
+    --line:           #DCE3E9;
+
+    /* Type */
+    --font-ui: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+
+    /* Spacing */
+    --gap-xs: 4px;
+    --gap-sm: 8px;
+    --gap:    16px;
+    --gap-lg: 24px;
+    --gap-xl: 40px;
+
+    --radius: 4px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+body {
+    font-family: var(--font-ui);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--canvas);
+}
+
+/* Times, dates and money align in columns only with tabular figures —
+   proportional digits make a price list impossible to scan. */
+.tabular, td.amount, .slot, .money, time {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+}
+
+/* ---------------------------------------------------------------------
+   Login
+   --------------------------------------------------------------------- */
+
+.login-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(160deg, var(--brand-dark) 0%, var(--brand) 100%);
+    padding: var(--gap);
+}
+
+.login-card {
+    background: var(--surface);
+    width: 100%;
+    max-width: 380px;
+    padding: var(--gap-xl) var(--gap-lg) var(--gap-lg);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+}
+
+.login-card h1 {
+    margin: 0;
+    font-size: 19px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brand);
+    text-align: center;
+}
+
+.login-card .subtitle {
+    margin: var(--gap-xs) 0 var(--gap-xl);
+    text-align: center;
+    font-size: 12px;
+    color: var(--ink-faint);
+    letter-spacing: 0.04em;
+}
+
+/* ---------------------------------------------------------------------
+   Application shell
+   --------------------------------------------------------------------- */
+
+.shell {
+    display: grid;
+    grid-template-columns: 216px 1fr;
+    min-height: 100vh;
+}
+
+.sidebar {
+    background: var(--brand-dark);
+    color: #C9D8E4;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar .brand {
+    padding: var(--gap-lg) var(--gap);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar .brand strong {
+    display: block;
+    color: #FFFFFF;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.sidebar .brand span {
+    font-size: 11px;
+    color: #8CA7BC;
+}
+
+.sidebar nav {
+    padding: var(--gap-sm) 0;
+    flex: 1;
+}
+
+.sidebar nav a {
+    display: block;
+    padding: 9px var(--gap);
+    color: #C9D8E4;
+    text-decoration: none;
+    font-size: 13px;
+    border-left: 3px solid transparent;
+}
+
+.sidebar nav a:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #FFFFFF;
+}
+
+.sidebar nav a.active {
+    background: rgba(255, 255, 255, 0.1);
+    color: #FFFFFF;
+    border-left-color: var(--accent-line);
+}
+
+.sidebar .who {
+    padding: var(--gap);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 12px;
+}
+
+.sidebar .who strong {
+    display: block;
+    color: #FFFFFF;
+}
+
+.sidebar .who .role {
+    color: #8CA7BC;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 10px;
+}
+
+.main {
+    padding: var(--gap-lg) var(--gap-xl) var(--gap-xl);
+    max-width: 1100px;
+}
+
+.page-title {
+    margin: 0 0 var(--gap-xs);
+    font-size: 20px;
+    color: var(--brand-dark);
+}
+
+.page-lede {
+    margin: 0 0 var(--gap-lg);
+    color: var(--ink-soft);
+    font-size: 13px;
+}
+
+/* ---------------------------------------------------------------------
+   Panels
+   --------------------------------------------------------------------- */
+
+.panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    margin-bottom: var(--gap-lg);
+}
+
+.panel > h2 {
+    margin: 0;
+    padding: 11px var(--gap);
+    font-size: 12px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--brand);
+    background: var(--brand-tint);
+    border-bottom: 1px solid var(--line);
+    border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.panel-body { padding: var(--gap); }
+
+/* ---------------------------------------------------------------------
+   Forms
+   --------------------------------------------------------------------- */
+
+.field { margin-bottom: var(--gap); }
+
+.field label {
+    display: block;
+    margin-bottom: var(--gap-xs);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+}
+
+.field .req { color: var(--danger); }
+
+input[type="text"],
+input[type="password"],
+input[type="date"],
+input[type="tel"],
+input[type="email"],
+select,
+textarea {
+    width: 100%;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+input:focus, select:focus, textarea:focus {
+    outline: 2px solid var(--brand);
+    outline-offset: -1px;
+    border-color: var(--brand);
+}
+
+/* Errors sit against the field they belong to. A single summary at the top
+   of a long form makes the reader hunt for what actually went wrong. */
+.field.invalid input,
+.field.invalid select,
+.field.invalid textarea {
+    border-color: var(--danger);
+    background: var(--danger-tint);
+}
+
+.field-error {
+    display: none;
+    margin-top: var(--gap-xs);
+    font-size: 12px;
+    color: var(--danger);
+}
+
+.field.invalid .field-error { display: block; }
+
+.row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap);
+}
+
+.row-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--gap);
+}
+
+.hint {
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-top: var(--gap-xs);
+}
+
+/* ---------------------------------------------------------------------
+   Buttons
+   --------------------------------------------------------------------- */
+
+button, .btn {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 18px;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    cursor: pointer;
+    background: var(--brand);
+    color: #FFFFFF;
+}
+
+button:hover, .btn:hover { background: var(--brand-dark); }
+
+button:focus-visible, .btn:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+}
+
+button[disabled] {
+    background: var(--line);
+    color: var(--ink-faint);
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background: var(--surface);
+    color: var(--brand);
+    border-color: var(--line);
+}
+
+.btn-secondary:hover {
+    background: var(--brand-tint);
+    color: var(--brand-dark);
+}
+
+.btn-block { width: 100%; }
+
+.actions {
+    display: flex;
+    gap: var(--gap-sm);
+    align-items: center;
+}
+
+/* ---------------------------------------------------------------------
+   Slot grid — the signature element
+   A dentist's day is a column of 30-minute slots, so the interface shows
+   exactly that rather than hiding it behind a dropdown. Taken slots stay
+   visible and struck through: the receptionist can see the shape of the
+   day, which is what the paper diary gave them and a select element does
+   not.
+   --------------------------------------------------------------------- */
+
+.slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+    gap: 6px;
+}
+
+.slot {
+    padding: 8px 4px;
+    text-align: center;
+    font-size: 13px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    cursor: pointer;
+    user-select: none;
+}
+
+.slot:hover:not(.taken) {
+    border-color: var(--accent-line);
+    background: var(--accent);
+}
+
+.slot.selected {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: #FFFFFF;
+    font-weight: 600;
+}
+
+.slot.taken {
+    background: var(--canvas);
+    color: var(--ink-faint);
+    text-decoration: line-through;
+    cursor: not-allowed;
+    border-style: dashed;
+}
+
+.slot-legend {
+    display: flex;
+    gap: var(--gap);
+    margin-top: var(--gap-sm);
+    font-size: 11px;
+    color: var(--ink-faint);
+}
+
+.slot-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.swatch {
+    width: 11px;
+    height: 11px;
+    border-radius: 2px;
+    border: 1px solid var(--line);
+    display: inline-block;
+}
+
+.swatch.free  { background: var(--surface); }
+.swatch.taken { background: var(--canvas); border-style: dashed; }
+.swatch.sel   { background: var(--brand); border-color: var(--brand); }
+
+/* ---------------------------------------------------------------------
+   Messages
+   --------------------------------------------------------------------- */
+
+.notice {
+    display: none;
+    padding: 11px var(--gap);
+    border-radius: var(--radius);
+    margin-bottom: var(--gap);
+    font-size: 13px;
+    border-left: 3px solid;
+}
+
+.notice.show { display: block; }
+
+.notice.error {
+    background: var(--danger-tint);
+    border-left-color: var(--danger);
+    color: #7A1B16;
+}
+
+.notice.ok {
+    background: var(--accent);
+    border-left-color: var(--accent-line);
+    color: #1D5C53;
+}
+
+.notice.warn {
+    background: var(--warn);
+    border-left-color: var(--warn-line);
+    color: #7A5715;
+}
+
+/* ---------------------------------------------------------------------
+   Tables
+   --------------------------------------------------------------------- */
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+th {
+    text-align: left;
+    padding: 8px var(--gap-sm);
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--line);
+}
+
+td {
+    padding: 9px var(--gap-sm);
+    border-bottom: 1px solid var(--line);
+}
+
+td.amount, th.amount { text-align: right; }
+
+tbody tr:hover { background: var(--brand-tint); }
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: 7px var(--gap);
+    font-size: 13px;
+}
+
+.detail-grid dt {
+    color: var(--ink-soft);
+    font-weight: 600;
+}
+
+.detail-grid dd { margin: 0; }
+
+/* ---------------------------------------------------------------------
+   Status pills
+   --------------------------------------------------------------------- */
+
+.pill {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+.pill.scheduled { background: var(--brand-tint); color: var(--brand); }
+.pill.completed { background: var(--accent);     color: #1D5C53; }
+.pill.cancelled { background: var(--danger-tint); color: var(--danger); }
+.pill.no_show   { background: var(--warn);       color: #7A5715; }
+.pill.pending   { background: var(--warn);       color: #7A5715; }
+.pill.paid      { background: var(--accent);     color: #1D5C53; }
+
+/* ---------------------------------------------------------------------
+   Empty states — an invitation to act, not an apology
+   --------------------------------------------------------------------- */
+
+.empty {
+    padding: var(--gap-xl) var(--gap);
+    text-align: center;
+    color: var(--ink-faint);
+    font-size: 13px;
+}
+
+/* ---------------------------------------------------------------------
+   Help page
+   --------------------------------------------------------------------- */
+
+.help-step {
+    display: grid;
+    grid-template-columns: 30px 1fr;
+    gap: var(--gap);
+    padding: var(--gap) 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.help-step:last-child { border-bottom: none; }
+
+.help-step .n {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--brand);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.help-step h3 {
+    margin: 2px 0 var(--gap-xs);
+    font-size: 14px;
+    color: var(--brand-dark);
+}
+
+.help-step p { margin: 0; color: var(--ink-soft); font-size: 13px; }
+
+/* ---------------------------------------------------------------------
+   Bill summary
+   --------------------------------------------------------------------- */
+
+.bill-lines { width: 100%; font-size: 13px; }
+.bill-lines td { border: none; padding: 5px 0; }
+.bill-lines td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+
+.bill-lines tr.total td {
+    border-top: 2px solid var(--brand);
+    padding-top: var(--gap-sm);
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--brand-dark);
+}
+
+.bill-lines tr.discount td { color: var(--accent-line); }
+
+/* ---------------------------------------------------------------------
+   Responsive
+   --------------------------------------------------------------------- */
+
+@media (max-width: 860px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar { flex-direction: row; flex-wrap: wrap; align-items: center; }
+    .sidebar nav { display: flex; flex-wrap: wrap; padding: 0; }
+    .sidebar nav a { border-left: none; border-bottom: 3px solid transparent; }
+    .sidebar nav a.active { border-left: none; border-bottom-color: var(--accent-line); }
+    .main { padding: var(--gap); }
+    .row, .row-3 { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+}

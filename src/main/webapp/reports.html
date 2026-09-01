@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reports — Sunrise Dental Clinic</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="shell">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+        <h1 class="page-title">Reports</h1>
+        <p class="page-lede">Operational and financial summaries.</p>
+
+        <div id="notice" class="notice"></div>
+
+        <section class="panel">
+            <h2>Daily appointment schedule</h2>
+            <div class="panel-body">
+                <div class="row">
+                    <div class="field">
+                        <label for="reportDate">Date</label>
+                        <input type="date" id="reportDate">
+                        <div class="field-error"></div>
+                    </div>
+                    <div class="field" style="align-self:end">
+                        <button onclick="runSchedule()">Run report</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" id="outputPanel" style="display:none">
+            <h2 id="outputTitle">Result</h2>
+            <div class="panel-body" style="padding:0" id="outputBody"></div>
+        </section>
+    </main>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+(async () => {
+    const user = await Ui.requireSession();
+    Ui.renderShell(user, 'reports.html');
+    document.getElementById('reportDate').value = Ui.today();
+})();
+
+async function runSchedule() {
+    Ui.clearNotice('notice');
+    const date = document.getElementById('reportDate').value;
+
+    if (!date) {
+        Ui.notice('notice', 'error', 'Choose a date to run the report.');
+        return;
+    }
+
+    try {
+        const list = await Api.appointmentsOn(date);
+        const body = document.getElementById('outputBody');
+
+        document.getElementById('outputTitle').textContent =
+            'Appointments on ' + date;
+
+        if (!list.length) {
+            body.innerHTML = '<p class="empty">No appointments on that date.</p>';
+        } else {
+            const scheduled = list.filter(a => a.status === 'SCHEDULED').length;
+            const cancelled = list.filter(a => a.status === 'CANCELLED').length;
+
+            body.innerHTML =
+                '<table><thead><tr>'
+                + '<th>Time</th><th>Appointment</th><th>Patient</th>'
+                + '<th>Dentist</th><th>Treatment</th>'
+                + '<th class="amount">Cost (LKR)</th><th>Status</th>'
+                + '</tr></thead><tbody>'
+                + list.map(a => '<tr>'
+                    + '<td class="tabular">' + Ui.escape(a.appointmentTime) + '</td>'
+                    + '<td class="tabular">' + Ui.escape(a.appointmentNo) + '</td>'
+                    + '<td>' + Ui.escape(a.patientName) + '</td>'
+                    + '<td>' + Ui.escape(a.dentistName) + '</td>'
+                    + '<td>' + Ui.escape(a.treatmentName) + '</td>'
+                    + '<td class="amount">' + Ui.money(a.treatmentCost) + '</td>'
+                    + '<td><span class="pill ' + a.status.toLowerCase() + '">'
+                    + Ui.escape(a.status.replace('_', ' ')) + '</span></td>'
+                    + '</tr>').join('')
+                + '</tbody></table>'
+                + '<p class="hint" style="padding:12px 16px">'
+                + list.length + ' appointments · ' + scheduled + ' scheduled · '
+                + cancelled + ' cancelled</p>';
+        }
+        document.getElementById('outputPanel').style.display = '';
+
+    } catch (error) {
+        Ui.notice('notice', 'error', error.message);
+    }
+}
+</script>
+
+</body>
+</html>
