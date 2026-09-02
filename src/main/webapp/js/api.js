@@ -99,7 +99,67 @@ const Api = (() => {
 
         generateBill: (appointmentNo) =>
             request('api/bills?appointmentNo=' + encodeURIComponent(appointmentNo),
-                { method: 'POST' })
+                { method: 'POST' }),
+
+        /* -----------------------------------------------------------
+           Dentists, treatments, patients, staff
+           ----------------------------------------------------------- */
+
+        dentists: (activeOnly) =>
+            request('api/dentists' + (activeOnly ? '?activeOnly=true' : '')),
+
+        saveDentist: (dentist) =>
+            request('api/dentists', {
+                method: 'POST', body: JSON.stringify(dentist)
+            }),
+
+        setDentistActive: (id, active) =>
+            request('api/dentists?action=' + (active ? 'reinstate' : 'retire')
+                + '&id=' + encodeURIComponent(id), { method: 'POST' }),
+
+        treatments: (activeOnly) =>
+            request('api/treatments' + (activeOnly ? '?activeOnly=true' : '')),
+
+        saveTreatment: (treatment) =>
+            request('api/treatments', {
+                method: 'POST', body: JSON.stringify(treatment)
+            }),
+
+        setTreatmentActive: (id, active) =>
+            request('api/treatments?action=' + (active ? 'reinstate' : 'retire')
+                + '&id=' + encodeURIComponent(id), { method: 'POST' }),
+
+        patients: () => request('api/patients'),
+
+        patient: (id) => request('api/patients?id=' + encodeURIComponent(id)),
+
+        staff: () => request('api/users'),
+
+        createStaff: (account) =>
+            request('api/users', { method: 'POST', body: JSON.stringify(account) }),
+
+        setStaffActive: (id, active) =>
+            request('api/users?action=' + (active ? 'enable' : 'disable')
+                + '&id=' + encodeURIComponent(id), { method: 'POST' }),
+
+        resetStaffPassword: (id, password) =>
+            request('api/users?action=resetPassword&id=' + encodeURIComponent(id)
+                + '&password=' + encodeURIComponent(password), { method: 'POST' }),
+
+        /* -----------------------------------------------------------
+           Reports
+           ----------------------------------------------------------- */
+
+        report: (type, params = {}) => {
+            const query = new URLSearchParams({ type, ...params }).toString();
+            return request('api/reports?' + query);
+        },
+
+        /* Closing out a visit. Cancellation has its own endpoint because it
+           carries the two-hour cutoff rule. */
+        setAppointmentStatus: (appointmentNo, status) =>
+            request('api/appointments/status?no=' + encodeURIComponent(appointmentNo)
+                + '&status=' + encodeURIComponent(status), { method: 'POST' })
     };
 })();
 
@@ -122,13 +182,20 @@ const Ui = {
 
     /** Renders the sidebar, showing only what this role may use. */
     renderShell(user, activePage) {
+        const both = ['ADMINISTRATOR', 'RECEPTIONIST'];
+
         const links = [
-            { href: 'index.html',   label: 'Dashboard',      roles: ['ADMINISTRATOR', 'RECEPTIONIST', 'DENTIST'] },
-            { href: 'booking.html', label: 'New appointment', roles: ['ADMINISTRATOR', 'RECEPTIONIST'] },
-            { href: 'search.html',  label: 'Find appointment', roles: ['ADMINISTRATOR', 'RECEPTIONIST', 'DENTIST'] },
-            { href: 'billing.html', label: 'Billing',        roles: ['ADMINISTRATOR', 'RECEPTIONIST'] },
-            { href: 'reports.html', label: 'Reports',        roles: ['ADMINISTRATOR', 'RECEPTIONIST', 'DENTIST'] },
-            { href: 'help.html',    label: 'Help',           roles: ['ADMINISTRATOR', 'RECEPTIONIST', 'DENTIST'] }
+            { href: 'index.html',      label: 'Dashboard',       roles: both },
+            { href: 'booking.html',    label: 'New appointment', roles: both },
+            { href: 'search.html',     label: 'Find appointment', roles: both },
+            { href: 'billing.html',    label: 'Billing',         roles: both },
+            { href: 'patients.html',   label: 'Patients',        roles: both },
+            { href: 'dentists.html',   label: 'Dentists',        roles: both },
+            { href: 'treatments.html', label: 'Treatments',      roles: both },
+            { href: 'reports.html',    label: 'Reports',         roles: both },
+            // Staff accounts are the one thing reserved for the administrator.
+            { href: 'staff.html',      label: 'Staff accounts',  roles: ['ADMINISTRATOR'] },
+            { href: 'help.html',       label: 'Help',            roles: both }
         ];
 
         const nav = links

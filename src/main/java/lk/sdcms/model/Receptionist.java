@@ -2,6 +2,14 @@ package lk.sdcms.model;
 
 import java.util.Set;
 
+/**
+ * The clinic's main operator.
+ *
+ * <p>Carries every operational duty. This deliberately forgoes the separation
+ * of duties between price maintenance and billing that a larger organisation
+ * would enforce; with three staff on site that separation is impractical, and
+ * audit_log serves as the compensating control instead.
+ */
 public class Receptionist extends User {
 
     private String counterNo;
@@ -10,20 +18,15 @@ public class Receptionist extends User {
         setRole(Role.RECEPTIONIST);
     }
 
-    /**
-     * Deliberately excludes TREATMENT_PRICE_MANAGE. A receptionist who could
-     * both set prices and issue bills could under-charge and conceal it —
-     * separation of duties.
-     */
     @Override
     public Set<String> getPermissions() {
         return Set.of(
-                "PATIENT_REGISTER",
-                "APPOINTMENT_BOOK",
-                "APPOINTMENT_VIEW",
-                "APPOINTMENT_CANCEL",
-                "BILL_GENERATE",
-                "REPORT_VIEW_SCHEDULE"
+                "PATIENT_MANAGE",
+                "APPOINTMENT_MANAGE",
+                "BILL_MANAGE",
+                "DENTIST_MANAGE",
+                "TREATMENT_MANAGE",
+                "REPORT_VIEW"
         );
     }
 

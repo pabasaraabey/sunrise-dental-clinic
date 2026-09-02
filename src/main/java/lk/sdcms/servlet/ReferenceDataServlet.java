@@ -50,6 +50,8 @@ public class ReferenceDataServlet extends HttpServlet {
                             "baseCost",        t.getBaseCost(),
                             "durationMinutes", t.getDurationMinutes()))
                     .toList());
+            // Map.of rejects null values, so every field mapped above must be
+            // non-null in the database. Both are NOT NULL columns.
 
             HttpResponses.writeJson(response, HttpServletResponse.SC_OK, payload);
 

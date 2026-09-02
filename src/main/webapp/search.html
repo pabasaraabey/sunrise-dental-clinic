@@ -23,9 +23,9 @@
                 <form id="searchForm" autocomplete="off">
                     <div class="row">
                         <div class="field">
-                            <label for="appointmentNo">Appointment number</label>
+                            <label for="appointmentNo">Appointment number or contact number</label>
                             <input type="text" id="appointmentNo"
-                                   placeholder="APT-20260821-0001">
+                                   placeholder="APT-20260821-0001 or 0771234567">
                             <div class="field-error"></div>
                         </div>
                         <div class="field" style="align-self:end">
@@ -69,18 +69,26 @@ document.getElementById('searchForm').addEventListener('submit', async (event) =
 
     if (!Validate.required('appointmentNo', 'Appointment number')) return;
 
+    const term = document.getElementById('appointmentNo').value.trim();
     document.getElementById('listPanel').style.display = 'none';
 
+    // Ten digits beginning with zero is a phone number, not an appointment
+    // number. Reception often has the patient's phone to hand rather than
+    // the appointment slip, so both are accepted in one box.
+    if (/^0\d{9}$/.test(term)) {
+        await searchByContact(term);
+        return;
+    }
+
     try {
-        const a = await Api.findAppointment(
-            document.getElementById('appointmentNo').value.trim());
+        const a = await Api.findAppointment(term);
         showAppointment(a);
 
     } catch (error) {
         document.getElementById('resultPanel').style.display = 'none';
         if (error.status === 404) {
             Ui.notice('notice', 'warn',
-                'No appointment found with that number. Check the number and try again.');
+                'No appointment found with that number. Check it and try again.');
         } else {
             Ui.notice('notice', 'error', error.message);
         }
@@ -146,6 +154,57 @@ async function cancelBooking(appointmentNo) {
         } else {
             Ui.notice('notice', 'error', error.message);
         }
+    }
+}
+
+/** Finds the patient by phone, then lists every visit they have made. */
+async function searchByContact(contactNo) {
+    document.getElementById('resultPanel').style.display = 'none';
+
+    try {
+        const all = await Api.patients();
+        const patient = all.find(p => p.contactNo === contactNo);
+
+        if (!patient) {
+            Ui.notice('notice', 'warn',
+                'No patient registered with that contact number.');
+            return;
+        }
+
+        const data = await Api.patient(patient.patientId);
+
+        if (!data.visits.length) {
+            Ui.notice('notice', 'warn',
+                patient.fullName + ' is registered but has no appointments.');
+            return;
+        }
+
+        Ui.notice('notice', 'ok', data.visits.length + ' appointment'
+            + (data.visits.length === 1 ? '' : 's') + ' found for '
+            + patient.fullName + '.');
+
+        document.getElementById('listBody').innerHTML =
+            '<table><thead><tr>'
+            + '<th>Date</th><th>Appointment</th><th>Dentist</th>'
+            + '<th>Treatment</th><th>Status</th><th></th>'
+            + '</tr></thead><tbody>'
+            + data.visits.map(v => '<tr>'
+                + '<td class="tabular">' + Ui.escape(v.appointmentDate)
+                + ' ' + Ui.escape(v.appointmentTime) + '</td>'
+                + '<td class="tabular">' + Ui.escape(v.appointmentNo) + '</td>'
+                + '<td>' + Ui.escape(v.dentistName) + '</td>'
+                + '<td>' + Ui.escape(v.treatmentName) + '</td>'
+                + '<td><span class="pill ' + v.status.toLowerCase() + '">'
+                + Ui.escape(v.status.replace('_', ' ')) + '</span></td>'
+                + '<td><a href="#" onclick="openOne(\'' + v.appointmentNo
+                + '\');return false;">View</a></td>'
+                + '</tr>').join('')
+            + '</tbody></table>';
+
+        document.getElementById('listPanel').style.display = '';
+
+    } catch (error) {
+        Ui.notice('notice', 'error', error.message);
     }
 }
 

@@ -13,22 +13,65 @@
 
     <main class="main">
         <h1 class="page-title">Reports</h1>
-        <p class="page-lede">Operational and financial summaries.</p>
+        <p class="page-lede">
+            Operational and financial summaries. Each answers a question the
+            clinic has to make a decision about.
+        </p>
 
         <div id="notice" class="notice"></div>
 
         <section class="panel">
-            <h2>Daily appointment schedule</h2>
+            <h2>Choose a report</h2>
             <div class="panel-body">
-                <div class="row">
+
+                <div class="field">
+                    <label for="reportType">Report</label>
+                    <select id="reportType">
+                        <option value="schedule">Daily appointment schedule — who is coming in</option>
+                        <option value="workload">Dentist workload — is the load balanced</option>
+                        <option value="revenue">Revenue by day — what the clinic took</option>
+                        <option value="revenue-monthly">Revenue by month — the longer trend</option>
+                        <option value="treatments">Treatment popularity — what to stock and staff for</option>
+                        <option value="no-show">No-shows and cancellations — where revenue leaks</option>
+                        <option value="trend">Booking trend — volume over time, with a chart</option>
+                        <option value="patient-activity">Patient activity — who returns and who does not</option>
+                    </select>
+                    <div class="field-error"></div>
+                </div>
+
+                <div class="field" id="granularityField" style="display:none">
+                    <label for="granularity">Group by</label>
+                    <select id="granularity">
+                        <option value="day">Day</option>
+                        <option value="week">Week</option>
+                        <option value="month" selected>Month</option>
+                        <option value="year">Year</option>
+                    </select>
+                    <div class="field-error"></div>
+                </div>
+
+                <div class="row" id="rangeFields">
                     <div class="field">
-                        <label for="reportDate">Date</label>
-                        <input type="date" id="reportDate">
+                        <label for="fromDate">From</label>
+                        <input type="date" id="fromDate">
                         <div class="field-error"></div>
                     </div>
-                    <div class="field" style="align-self:end">
-                        <button onclick="runSchedule()">Run report</button>
+                    <div class="field">
+                        <label for="toDate">To</label>
+                        <input type="date" id="toDate">
+                        <div class="field-error"></div>
                     </div>
+                </div>
+
+                <div class="field" id="singleDateField">
+                    <label for="singleDate">Date</label>
+                    <input type="date" id="singleDate">
+                    <div class="field-error"></div>
+                </div>
+
+                <div class="actions">
+                    <button onclick="run()" id="runBtn">Run report</button>
+                    <button class="btn-secondary" onclick="window.print()">Print</button>
                 </div>
             </div>
         </section>
@@ -41,61 +84,275 @@
 </div>
 
 <script src="js/api.js"></script>
+<script src="js/charts.js"></script>
 <script>
 (async () => {
     const user = await Ui.requireSession();
     Ui.renderShell(user, 'reports.html');
-    document.getElementById('reportDate').value = Ui.today();
+
+    const today = Ui.today();
+    document.getElementById('singleDate').value = today;
+    document.getElementById('toDate').value = today;
+
+    // Default range is the current month — the period a clinic actually
+    // reviews, rather than an arbitrary rolling window.
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    document.getElementById('fromDate').value = monthStart.toISOString().slice(0, 10);
+
+    switchFields();
 })();
 
-async function runSchedule() {
-    Ui.clearNotice('notice');
-    const date = document.getElementById('reportDate').value;
+document.getElementById('reportType').addEventListener('change', switchFields);
 
-    if (!date) {
-        Ui.notice('notice', 'error', 'Choose a date to run the report.');
+/* The schedule report covers one day; the rest cover a range. Showing fields
+   that do not apply would invite the user to fill in something the report
+   then ignores. */
+function switchFields() {
+    const type = document.getElementById('reportType').value;
+
+    const isSingleDay = type === 'schedule';
+    // Patient activity covers every patient ever registered, so a date range
+    // would suggest a filter that does not exist.
+    const noDates = type === 'patient-activity';
+
+    document.getElementById('singleDateField').style.display = isSingleDay ? '' : 'none';
+    document.getElementById('rangeFields').style.display =
+        (isSingleDay || noDates) ? 'none' : '';
+    document.getElementById('granularityField').style.display =
+        type === 'trend' ? '' : 'none';
+}
+
+async function run() {
+    Ui.clearNotice('notice');
+
+    const type = document.getElementById('reportType').value;
+    const params = (type === 'schedule')
+        ? { date: document.getElementById('singleDate').value }
+        : {
+            from: document.getElementById('fromDate').value,
+            to:   document.getElementById('toDate').value
+          };
+
+    if (type === 'trend') {
+        params.granularity = document.getElementById('granularity').value;
+    }
+
+    if (type !== 'schedule' && params.from > params.to) {
+        Ui.notice('notice', 'error', 'The start date must not be after the end date.');
         return;
     }
 
+    const button = document.getElementById('runBtn');
+    button.disabled = true;
+    button.textContent = 'Running…';
+
     try {
-        const list = await Api.appointmentsOn(date);
-        const body = document.getElementById('outputBody');
+        const result = await Api.report(type, params);
 
         document.getElementById('outputTitle').textContent =
-            'Appointments on ' + date;
+            result.title + ' — ' + result.period;
 
-        if (!list.length) {
-            body.innerHTML = '<p class="empty">No appointments on that date.</p>';
-        } else {
-            const scheduled = list.filter(a => a.status === 'SCHEDULED').length;
-            const cancelled = list.filter(a => a.status === 'CANCELLED').length;
+        document.getElementById('outputBody').innerHTML =
+            result.rows.length ? RENDERERS[type](result.rows)
+                               : '<p class="empty">No data for that period.</p>';
 
-            body.innerHTML =
-                '<table><thead><tr>'
-                + '<th>Time</th><th>Appointment</th><th>Patient</th>'
-                + '<th>Dentist</th><th>Treatment</th>'
-                + '<th class="amount">Cost (LKR)</th><th>Status</th>'
-                + '</tr></thead><tbody>'
-                + list.map(a => '<tr>'
-                    + '<td class="tabular">' + Ui.escape(a.appointmentTime) + '</td>'
-                    + '<td class="tabular">' + Ui.escape(a.appointmentNo) + '</td>'
-                    + '<td>' + Ui.escape(a.patientName) + '</td>'
-                    + '<td>' + Ui.escape(a.dentistName) + '</td>'
-                    + '<td>' + Ui.escape(a.treatmentName) + '</td>'
-                    + '<td class="amount">' + Ui.money(a.treatmentCost) + '</td>'
-                    + '<td><span class="pill ' + a.status.toLowerCase() + '">'
-                    + Ui.escape(a.status.replace('_', ' ')) + '</span></td>'
-                    + '</tr>').join('')
-                + '</tbody></table>'
-                + '<p class="hint" style="padding:12px 16px">'
-                + list.length + ' appointments · ' + scheduled + ' scheduled · '
-                + cancelled + ' cancelled</p>';
-        }
         document.getElementById('outputPanel').style.display = '';
+        document.getElementById('outputPanel').scrollIntoView({ behavior: 'smooth' });
 
     } catch (error) {
-        Ui.notice('notice', 'error', error.message);
+        Ui.notice('notice', error.status === 403 ? 'warn' : 'error', error.message);
+
+    } finally {
+        button.disabled = false;
+        button.textContent = 'Run report';
     }
+}
+
+/* ---------------------------------------------------------------
+   One renderer per report. Each has a different shape, so a single
+   generic table renderer would fill up with special cases.
+   --------------------------------------------------------------- */
+
+const RENDERERS = {
+
+    schedule: (rows) => {
+        const scheduled = rows.filter(r => r.status === 'SCHEDULED').length;
+        const completed = rows.filter(r => r.status === 'COMPLETED').length;
+        const cancelled = rows.filter(r => r.status === 'CANCELLED').length;
+
+        return table(
+            ['Time', 'Appointment', 'Patient', 'Dentist', 'Treatment', 'Status'],
+            rows.map(r => [
+                cell(r.appointmentTime, 'tabular'),
+                cell(r.appointmentNo, 'tabular'),
+                cell(r.patientName),
+                cell(r.dentistName),
+                cell(r.treatmentName),
+                pill(r.status)
+            ]))
+            + summary(rows.length + ' appointments · ' + scheduled + ' scheduled · '
+                + completed + ' completed · ' + cancelled + ' cancelled');
+    },
+
+    workload: (rows) => {
+        const total = rows.reduce((sum, r) => sum + Number(r.appointments), 0);
+
+        return table(
+            ['Dentist', 'Specialisation', 'Appointments', 'Completed',
+             'Cancelled', 'No-show', 'Booked hours'],
+            rows.map(r => [
+                cell(r.dentist),
+                cell(r.specialization),
+                cell(r.appointments, 'amount'),
+                cell(r.completed, 'amount'),
+                cell(r.cancelled, 'amount'),
+                cell(r.noShow, 'amount'),
+                cell((Number(r.bookedMinutes) / 60).toFixed(1), 'amount')
+            ]))
+            + summary(total + ' appointments across ' + rows.length + ' dentists');
+    },
+
+    revenue: (rows) => {
+        const grand = rows.reduce((sum, r) => sum + Number(r.grandTotal), 0);
+
+        return table(
+            ['Day', 'Bills', 'Consultation', 'Treatment', 'Discount', 'VAT', 'Total'],
+            rows.map(r => [
+                cell(r.day, 'tabular'),
+                cell(r.bills, 'amount'),
+                cell(Ui.money(r.consultationTotal), 'amount'),
+                cell(Ui.money(r.treatmentTotal), 'amount'),
+                cell('\u2212 ' + Ui.money(r.discountTotal), 'amount'),
+                cell(Ui.money(r.taxTotal), 'amount'),
+                cell(Ui.money(r.grandTotal), 'amount')
+            ]))
+            + summary('Total for the period: LKR ' + Ui.money(grand));
+    },
+
+    'revenue-monthly': (rows) => {
+        const grand = rows.reduce((sum, r) => sum + Number(r.grandTotal), 0);
+
+        return table(
+            ['Month', 'Bills', 'Discount', 'VAT', 'Total'],
+            rows.map(r => [
+                cell(r.month, 'tabular'),
+                cell(r.bills, 'amount'),
+                cell('\u2212 ' + Ui.money(r.discountTotal), 'amount'),
+                cell(Ui.money(r.taxTotal), 'amount'),
+                cell(Ui.money(r.grandTotal), 'amount')
+            ]))
+            + summary('Total for the period: LKR ' + Ui.money(grand));
+    },
+
+    treatments: (rows) => table(
+        ['Treatment', 'Current price', 'Times booked', 'Completed', 'Revenue'],
+        rows.map(r => [
+            cell(r.treatment),
+            cell(Ui.money(r.currentPrice), 'amount'),
+            cell(r.timesBooked, 'amount'),
+            cell(r.completed, 'amount'),
+            cell(Ui.money(r.revenue), 'amount')
+        ]))
+        + summary('Current price is shown for reference. Revenue reflects what was '
+            + 'actually charged at the time, which may differ if prices have since '
+            + 'been revised.'),
+
+    trend: (rows) => {
+        const labels = rows.map(r => r.bucket);
+        const total = rows.reduce((sum, r) => sum + Number(r.bookings), 0);
+        const revenue = rows.reduce((sum, r) => sum + Number(r.revenue), 0);
+        const average = rows.length ? (total / rows.length).toFixed(1) : '0';
+
+        // Chart first, then the numbers behind it — the shape is what the
+        // reader is looking for, the table is for checking a figure.
+        return '<div style="padding:16px">'
+            + Chart.line(labels, [
+                { name: 'Bookings',  values: rows.map(r => r.bookings) },
+                { name: 'Completed', values: rows.map(r => r.completed) }
+              ])
+            + '</div>'
+            + table(
+                ['Period', 'Bookings', 'Completed', 'Cancelled', 'No-show', 'Revenue'],
+                rows.map(r => [
+                    cell(r.bucket, 'tabular'),
+                    cell(r.bookings, 'amount'),
+                    cell(r.completed, 'amount'),
+                    cell(r.cancelled, 'amount'),
+                    cell(r.noShow, 'amount'),
+                    cell(Ui.money(r.revenue), 'amount')
+                ]))
+            + summary(total + ' bookings across ' + rows.length + ' periods · '
+                + 'average ' + average + ' per period · '
+                + 'LKR ' + Ui.money(revenue) + ' billed');
+    },
+
+    'patient-activity': (rows) => {
+        const returning = rows.filter(r => r.returning).length;
+
+        return '<div style="padding:16px">'
+            + Chart.proportion([
+                { label: 'Returning patients', value: returning },
+                { label: 'First-time only', value: rows.length - returning }
+              ])
+            + '</div>'
+            + table(
+                ['Patient', 'Contact', 'Visits', 'Completed',
+                 'First visit', 'Last visit', 'Billed'],
+                rows.map(r => [
+                    cell(r.patientName),
+                    cell(r.contactNo, 'tabular'),
+                    cell(r.visits, 'amount'),
+                    cell(r.completedVisits, 'amount'),
+                    cell(r.firstVisit || '\u2014', 'tabular'),
+                    cell(r.lastVisit || '\u2014', 'tabular'),
+                    cell(Ui.money(r.totalBilled), 'amount')
+                ]))
+            + summary(rows.length + ' patients · ' + returning
+                + ' have returned at least once ('
+                + (rows.length ? Math.round(100 * returning / rows.length) : 0)
+                + '% retention)');
+    },
+
+    'no-show': (rows) => table(
+        ['Dentist', 'Appointments', 'Cancelled', 'No-show', 'Loss rate'],
+        rows.map(r => [
+            cell(r.dentist),
+            cell(r.total, 'amount'),
+            cell(r.cancelled, 'amount'),
+            cell(r.noShow, 'amount'),
+            cell(r.lossRate + '%', 'amount')
+        ]))
+        + summary('Loss rate is the share of appointments cancelled or not attended '
+            + '— slots that were held but went unused.')
+};
+
+/* ---------------------------------------------------------------
+   Helpers
+   --------------------------------------------------------------- */
+
+function table(headers, rows) {
+    return '<table><thead><tr>'
+        + headers.map((h, i) =>
+            '<th' + (i > 1 ? ' class="amount"' : '') + '>'
+            + Ui.escape(h) + '</th>').join('')
+        + '</tr></thead><tbody>'
+        + rows.map(cells => '<tr>' + cells.join('') + '</tr>').join('')
+        + '</tbody></table>';
+}
+
+function cell(value, className) {
+    return '<td' + (className ? ' class="' + className + '"' : '') + '>'
+        + Ui.escape(value === null || value === undefined ? '\u2014' : value) + '</td>';
+}
+
+function pill(status) {
+    return '<td><span class="pill ' + status.toLowerCase() + '">'
+        + Ui.escape(status.replace('_', ' ')) + '</span></td>';
+}
+
+function summary(text) {
+    return '<p class="hint" style="padding:12px 16px">' + Ui.escape(text) + '</p>';
 }
 </script>
 

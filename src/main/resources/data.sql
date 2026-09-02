@@ -3,11 +3,10 @@
 -- Run AFTER schema.sql
 --
 -- Login credentials (development only — change before any real use):
---   admin     / Admin@123
---   reception / Recep@123
---   dentist1  / Dentist@123
---   dentist2  / Dentist@123
---   dentist3  / Dentist@123
+--   admin     / Admin@123      (administrator — also manages staff accounts)
+--   reception / Recep@123      (receptionist — all operational duties)
+--
+-- Dentists are records, not logins. Reception maintains them.
 --
 -- Hashes are genuine BCrypt (cost 10). The $2a$ prefix is used because
 -- jBCrypt 0.4 does not accept the $2b$ variant.
@@ -17,19 +16,16 @@
 -- users
 -- ---------------------------------------------------------------------
 INSERT INTO users (username, password_hash, full_name, role) VALUES
-('admin',     '$2a$10$6TTC6LJRWCK6toyw3XF9EexFlQAkPO6rMC5ZyEfoLrJwXyEsml8Fq', 'Nimal Perera',        'ADMINISTRATOR'),
-('reception', '$2a$10$UIV.A1O5NZmq69SayM/b2O0WE3xSDSOJSkp44qDizPFeOZ.9bR6MC', 'Kamala Silva',        'RECEPTIONIST'),
-('dentist1',  '$2a$10$9xWVUyZY6Iy/BCWlnA590.kdYhdET4qFCG6EBfUZRPlxNODjR5Kmi', 'Dr. Ashan Fernando',  'DENTIST'),
-('dentist2',  '$2a$10$9xWVUyZY6Iy/BCWlnA590.kdYhdET4qFCG6EBfUZRPlxNODjR5Kmi', 'Dr. Ruwani Jayasuriya','DENTIST'),
-('dentist3',  '$2a$10$9xWVUyZY6Iy/BCWlnA590.kdYhdET4qFCG6EBfUZRPlxNODjR5Kmi', 'Dr. Sanjaya Bandara', 'DENTIST');
+('admin',     '$2a$10$6TTC6LJRWCK6toyw3XF9EexFlQAkPO6rMC5ZyEfoLrJwXyEsml8Fq', 'Nimal Perera', 'ADMINISTRATOR'),
+('reception', '$2a$10$UIV.A1O5NZmq69SayM/b2O0WE3xSDSOJSkp44qDizPFeOZ.9bR6MC', 'Kamala Silva', 'RECEPTIONIST');
 
 -- ---------------------------------------------------------------------
 -- dentists
 -- ---------------------------------------------------------------------
-INSERT INTO dentists (user_id, license_no, specialization, available_from, available_to, consultation_room) VALUES
-((SELECT user_id FROM users WHERE username = 'dentist1'), 'SLMC-DEN-4471', 'General Dentistry',  '08:00:00', '16:00:00', 'R-01'),
-((SELECT user_id FROM users WHERE username = 'dentist2'), 'SLMC-DEN-5182', 'Orthodontics',       '10:00:00', '18:00:00', 'R-02'),
-((SELECT user_id FROM users WHERE username = 'dentist3'), 'SLMC-DEN-6093', 'Oral Surgery',       '12:00:00', '20:00:00', 'R-03');
+INSERT INTO dentists (full_name, license_no, specialization, contact_no, available_from, available_to, consultation_room) VALUES
+('Dr. Ashan Fernando',   'SLMC-DEN-4471', 'General Dentistry', '0773334441', '08:00:00', '16:00:00', 'R-01'),
+('Dr. Ruwani Jayasuriya','SLMC-DEN-5182', 'Orthodontics',      '0773334442', '10:00:00', '18:00:00', 'R-02'),
+('Dr. Sanjaya Bandara',  'SLMC-DEN-6093', 'Oral Surgery',      '0773334443', '12:00:00', '20:00:00', 'R-03');
 
 -- ---------------------------------------------------------------------
 -- treatments — prices in LKR, representative of a private Colombo clinic

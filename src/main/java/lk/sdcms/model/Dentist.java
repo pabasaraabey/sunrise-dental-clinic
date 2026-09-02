@@ -1,28 +1,26 @@
 package lk.sdcms.model;
 
 import java.time.LocalTime;
-import java.util.Set;
 
-public class Dentist extends User {
+/**
+ * A dentist practising at the clinic.
+ *
+ * <p>A plain record, not a system user. Reception maintains these so names and
+ * specialisations appear on appointments and receipts; dentists have no login.
+ */
+public class Dentist {
 
     private Long      dentistId;
+    private String    fullName;
     private String    licenseNo;
     private String    specialization;
-    private LocalTime availableFrom;
-    private LocalTime availableTo;
+    private String    contactNo;
+    private LocalTime availableFrom = LocalTime.of(8, 0);
+    private LocalTime availableTo   = LocalTime.of(20, 0);
     private String    consultationRoom;
+    private boolean   active = true;
 
     public Dentist() {
-        setRole(Role.DENTIST);
-    }
-
-    /** Read-only access. A dentist has no operational need to issue bills. */
-    @Override
-    public Set<String> getPermissions() {
-        return Set.of(
-                "APPOINTMENT_VIEW_OWN",
-                "PATIENT_HISTORY_VIEW"
-        );
     }
 
     /**
@@ -40,11 +38,17 @@ public class Dentist extends User {
     public Long getDentistId()                  { return dentistId; }
     public void setDentistId(Long id)           { this.dentistId = id; }
 
+    public String getFullName()                 { return fullName; }
+    public void setFullName(String n)           { this.fullName = n; }
+
     public String getLicenseNo()                { return licenseNo; }
     public void setLicenseNo(String l)          { this.licenseNo = l; }
 
     public String getSpecialization()           { return specialization; }
     public void setSpecialization(String s)     { this.specialization = s; }
+
+    public String getContactNo()                { return contactNo; }
+    public void setContactNo(String c)          { this.contactNo = c; }
 
     public LocalTime getAvailableFrom()         { return availableFrom; }
     public void setAvailableFrom(LocalTime t)   { this.availableFrom = t; }
@@ -54,4 +58,7 @@ public class Dentist extends User {
 
     public String getConsultationRoom()         { return consultationRoom; }
     public void setConsultationRoom(String r)   { this.consultationRoom = r; }
+
+    public boolean isActive()                   { return active; }
+    public void setActive(boolean a)            { this.active = a; }
 }

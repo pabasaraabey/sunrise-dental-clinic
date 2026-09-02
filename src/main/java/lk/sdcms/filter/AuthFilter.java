@@ -9,7 +9,6 @@ import lk.sdcms.servlet.LoginServlet;
 import lk.sdcms.util.HttpResponses;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -18,14 +17,20 @@ import java.util.Set;
  *
  * <p>This is the security boundary. The browser client hides menu options the
  * current role may not use, but that is presentation only — anyone can open
- * developer tools, or call the endpoints directly with Postman, and the hidden
- * option is no obstacle at all. Authorisation has to be decided here, on the
+ * developer tools, or call the endpoints directly with Postman, and a hidden
+ * menu item is no obstacle at all. Authorisation has to be decided here, on the
  * server, where the caller cannot reach it.
  *
  * <p>A Filter is used rather than a check inside each servlet because a check
- * repeated in twelve places is a check that will eventually be forgotten in
+ * repeated in a dozen places is a check that will eventually be forgotten in
  * one of them. Intercepting centrally means a new endpoint is protected by
- * default.
+ * default rather than by remembering.
+ *
+ * <p>Only staff account management is restricted to the administrator. The
+ * receptionist carries every operational duty, including treatment prices —
+ * a deliberate departure from separation of duties, justified by the clinic
+ * having too few staff to divide the work, with audit_log as the compensating
+ * control.
  */
 @WebFilter(filterName = "AuthFilter", urlPatterns = "/api/*")
 public class AuthFilter implements Filter {
@@ -37,20 +42,9 @@ public class AuthFilter implements Filter {
             "/api/auth/session"
     );
 
-    /**
-     * Path prefix to the roles permitted on it.
-     *
-     * <p>Longest matching prefix wins, so a more specific rule can tighten a
-     * broader one. Anything not listed requires only a valid session.
-     */
+    /** Path prefix to the roles permitted on it. Longest match wins. */
     private static final Map<String, Set<Role>> ROLE_RULES = Map.of(
-            "/api/reports/revenue",   Set.of(Role.ADMINISTRATOR),
-            "/api/treatments/price",  Set.of(Role.ADMINISTRATOR),
-            "/api/users",             Set.of(Role.ADMINISTRATOR),
-            "/api/dentists/manage",   Set.of(Role.ADMINISTRATOR),
-            "/api/bills",             Set.of(Role.ADMINISTRATOR, Role.RECEPTIONIST),
-            "/api/patients",          Set.of(Role.ADMINISTRATOR, Role.RECEPTIONIST),
-            "/api/appointments/cancel", Set.of(Role.ADMINISTRATOR, Role.RECEPTIONIST)
+            "/api/users", Set.of(Role.ADMINISTRATOR)
     );
 
     @Override
@@ -85,9 +79,9 @@ public class AuthFilter implements Filter {
         if (permitted != null && !permitted.contains(user.getRole())) {
             // 403, not 401: identity is established, but this role may not do
             // this. Conflating the two leaves the client unable to tell
-            // "log in again" from "you cannot do this".
+            // "sign in again" from "you cannot do this".
             HttpResponses.writeError(response, HttpServletResponse.SC_FORBIDDEN,
-                    "Your role does not permit this operation", path);
+                    "Only an administrator can manage staff accounts", path);
             return;
         }
 
@@ -111,10 +105,5 @@ public class AuthFilter implements Filter {
         return (session == null)
                 ? null
                 : (User) session.getAttribute(LoginServlet.SESSION_USER);
-    }
-
-    /** Roles permitted on a path, exposed so the rules can be unit tested. */
-    public static List<String> rulesForTesting() {
-        return ROLE_RULES.keySet().stream().sorted().toList();
     }
 }

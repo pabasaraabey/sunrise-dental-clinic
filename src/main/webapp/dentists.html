@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dentists — Sunrise Dental Clinic</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="shell">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+        <h1 class="page-title">Dentists</h1>
+        <p class="page-lede">
+            Add the dentists practising at the clinic. Their names and
+            specialisations appear on appointments and receipts.
+        </p>
+
+        <div id="notice" class="notice"></div>
+
+        <section class="panel">
+            <h2 id="formTitle">Add a dentist</h2>
+            <div class="panel-body">
+                <form id="dentistForm" autocomplete="off">
+                    <input type="hidden" id="dentistId">
+
+                    <div class="row">
+                        <div class="field">
+                            <label for="fullName">Name <span class="req">*</span></label>
+                            <input type="text" id="fullName" placeholder="Dr. Ashan Fernando">
+                            <div class="field-error"></div>
+                        </div>
+                        <div class="field">
+                            <label for="licenseNo">SLMC licence number <span class="req">*</span></label>
+                            <input type="text" id="licenseNo" placeholder="SLMC-DEN-4471">
+                            <div class="field-error"></div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="field">
+                            <label for="specialization">Specialisation <span class="req">*</span></label>
+                            <input type="text" id="specialization" placeholder="General Dentistry">
+                            <div class="field-error"></div>
+                        </div>
+                        <div class="field">
+                            <label for="contactNo">Contact number</label>
+                            <input type="tel" id="contactNo" placeholder="0771234567" maxlength="10">
+                            <div class="field-error"></div>
+                        </div>
+                    </div>
+
+                    <div class="row-3">
+                        <div class="field">
+                            <label for="availableFrom">Works from <span class="req">*</span></label>
+                            <input type="time" id="availableFrom" value="08:00" step="1800">
+                            <div class="field-error"></div>
+                        </div>
+                        <div class="field">
+                            <label for="availableTo">Works until <span class="req">*</span></label>
+                            <input type="time" id="availableTo" value="17:00" step="1800">
+                            <div class="field-error"></div>
+                        </div>
+                        <div class="field">
+                            <label for="consultationRoom">Room</label>
+                            <input type="text" id="consultationRoom" placeholder="R-01" maxlength="10">
+                            <div class="field-error"></div>
+                        </div>
+                    </div>
+
+                    <p class="hint">
+                        Working hours must fall within the clinic's 08:00 to 20:00 day.
+                        Only slots inside these hours can be booked for this dentist.
+                    </p>
+
+                    <div class="actions" style="margin-top:16px">
+                        <button type="submit" id="saveBtn">Add dentist</button>
+                        <button type="button" class="btn-secondary" id="cancelEdit"
+                                style="display:none" onclick="resetForm()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Registered dentists</h2>
+            <div class="panel-body" style="padding:0" id="listBody">
+                <p class="empty">Loading…</p>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/validators.js"></script>
+<script>
+let dentists = [];
+
+(async () => {
+    const user = await Ui.requireSession();
+    Ui.renderShell(user, 'dentists.html');
+    await load();
+})();
+
+async function load() {
+    try {
+        dentists = await Api.dentists(false);
+        render();
+    } catch (error) {
+        Ui.notice('notice', 'error', error.message);
+    }
+}
+
+function render() {
+    const body = document.getElementById('listBody');
+
+    if (!dentists.length) {
+        body.innerHTML = '<p class="empty">No dentists registered yet. '
+            + 'Add the first one above.</p>';
+        return;
+    }
+
+    body.innerHTML = '<table><thead><tr>'
+        + '<th>Name</th><th>Specialisation</th><th>Licence</th>'
+        + '<th>Hours</th><th>Room</th><th>Status</th><th></th>'
+        + '</tr></thead><tbody>'
+        + dentists.map(d => '<tr>'
+            + '<td>' + Ui.escape(d.fullName) + '</td>'
+            + '<td>' + Ui.escape(d.specialization) + '</td>'
+            + '<td class="tabular">' + Ui.escape(d.licenseNo) + '</td>'
+            + '<td class="tabular">' + Ui.escape(d.availableFrom) + '–'
+            + Ui.escape(d.availableTo) + '</td>'
+            + '<td>' + Ui.escape(d.consultationRoom || '—') + '</td>'
+            + '<td><span class="pill ' + (d.active ? 'completed' : 'cancelled') + '">'
+            + (d.active ? 'active' : 'retired') + '</span></td>'
+            + '<td>'
+            + '<a href="#" onclick="edit(' + d.dentistId + ');return false;">Edit</a>'
+            + ' · <a href="#" onclick="toggle(' + d.dentistId + ',' + !d.active
+            + ');return false;">' + (d.active ? 'Retire' : 'Reinstate') + '</a>'
+            + '</td>'
+            + '</tr>').join('')
+        + '</tbody></table>';
+}
+
+function edit(id) {
+    const d = dentists.find(x => x.dentistId === id);
+    if (!d) return;
+
+    document.getElementById('dentistId').value       = d.dentistId;
+    document.getElementById('fullName').value         = d.fullName;
+    document.getElementById('licenseNo').value        = d.licenseNo;
+    document.getElementById('specialization').value   = d.specialization;
+    document.getElementById('contactNo').value        = d.contactNo || '';
+    document.getElementById('availableFrom').value    = d.availableFrom;
+    document.getElementById('availableTo').value      = d.availableTo;
+    document.getElementById('consultationRoom').value = d.consultationRoom || '';
+
+    document.getElementById('formTitle').textContent = 'Edit ' + d.fullName;
+    document.getElementById('saveBtn').textContent   = 'Save changes';
+    document.getElementById('cancelEdit').style.display = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetForm() {
+    document.getElementById('dentistForm').reset();
+    document.getElementById('dentistId').value = '';
+    document.getElementById('availableFrom').value = '08:00';
+    document.getElementById('availableTo').value = '17:00';
+    document.getElementById('formTitle').textContent = 'Add a dentist';
+    document.getElementById('saveBtn').textContent = 'Add dentist';
+    document.getElementById('cancelEdit').style.display = 'none';
+    Validate.clearAll('dentistForm');
+}
+
+async function toggle(id, activate) {
+    // Retiring is reversible and does not touch history, so no confirmation
+    // dialog — the wording on the link already says what will happen.
+    Ui.clearNotice('notice');
+    try {
+        const result = await Api.setDentistActive(id, activate);
+        Ui.notice('notice', 'ok', result.message);
+        await load();
+    } catch (error) {
+        Ui.notice('notice', 'error', error.message);
+    }
+}
+
+document.getElementById('dentistForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    Ui.clearNotice('notice');
+    Validate.clearAll('dentistForm');
+
+    const checks = [
+        Validate.required('fullName', 'Name'),
+        Validate.required('licenseNo', 'Licence number'),
+        Validate.required('specialization', 'Specialisation'),
+        Validate.required('availableFrom', 'Start time'),
+        Validate.required('availableTo', 'End time')
+    ];
+
+    const contact = document.getElementById('contactNo').value.trim();
+    if (contact && !/^0\d{9}$/.test(contact)) {
+        checks.push(Validate.markInvalid('contactNo',
+            'Enter 10 digits beginning with 0, or leave blank'));
+    }
+
+    const from = document.getElementById('availableFrom').value;
+    const to   = document.getElementById('availableTo').value;
+
+    if (from && to && from >= to) {
+        checks.push(Validate.markInvalid('availableTo',
+            'The end of the working day must be after the start'));
+    }
+    if (from && from < '08:00') {
+        checks.push(Validate.markInvalid('availableFrom',
+            'The clinic opens at 08:00'));
+    }
+    if (to && to > '20:00') {
+        checks.push(Validate.markInvalid('availableTo',
+            'The clinic closes at 20:00'));
+    }
+
+    if (checks.includes(false)) return;
+
+    const idValue = document.getElementById('dentistId').value;
+
+    const payload = {
+        dentistId:        idValue ? Number(idValue) : null,
+        fullName:         document.getElementById('fullName').value.trim(),
+        licenseNo:        document.getElementById('licenseNo').value.trim(),
+        specialization:   document.getElementById('specialization').value.trim(),
+        contactNo:        contact || null,
+        availableFrom:    from,
+        availableTo:      to,
+        consultationRoom: document.getElementById('consultationRoom').value.trim() || null
+    };
+
+    const button = document.getElementById('saveBtn');
+    button.disabled = true;
+
+    try {
+        await Api.saveDentist(payload);
+        Ui.notice('notice', 'ok',
+            idValue ? 'Dentist updated.' : 'Dentist added.');
+        resetForm();
+        await load();
+
+    } catch (error) {
+        // 409 means the licence number belongs to someone else — a genuine
+        // data conflict rather than a malformed form.
+        Ui.notice('notice', error.status === 409 ? 'warn' : 'error', error.message);
+
+    } finally {
+        button.disabled = false;
+    }
+});
+</script>
+
+</body>
+</html>

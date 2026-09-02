@@ -21,7 +21,7 @@ CREATE TABLE users (
     username        VARCHAR(50)  NOT NULL,
     password_hash   VARCHAR(60)  NOT NULL,   -- BCrypt output is always 60 chars
     full_name       VARCHAR(100) NOT NULL,
-    role            ENUM('ADMINISTRATOR','RECEPTIONIST','DENTIST') NOT NULL,
+    role            ENUM('ADMINISTRATOR','RECEPTIONIST') NOT NULL,
     is_active       BOOLEAN      NOT NULL DEFAULT TRUE,
     failed_attempts INT          NOT NULL DEFAULT 0,
     locked_until    DATETIME     NULL,
@@ -32,23 +32,26 @@ CREATE TABLE users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------
--- dentists — extends users rather than duplicating credentials
+-- dentists
+--
+-- Records rather than system users. Reception maintains these so names and
+-- specialisations flow through to appointments and receipts; dentists do
+-- not log in. Retired with is_active rather than deleted, because
+-- appointments reference them.
 -- ---------------------------------------------------------------------
 CREATE TABLE dentists (
-    dentist_id        BIGINT      NOT NULL AUTO_INCREMENT,
-    user_id           BIGINT      NOT NULL,
-    license_no        VARCHAR(30) NOT NULL,
-    specialization    VARCHAR(80) NOT NULL,
-    available_from    TIME        NOT NULL DEFAULT '08:00:00',
-    available_to      TIME        NOT NULL DEFAULT '20:00:00',
-    consultation_room VARCHAR(10) NULL,
-    is_active         BOOLEAN     NOT NULL DEFAULT TRUE,
+    dentist_id        BIGINT       NOT NULL AUTO_INCREMENT,
+    full_name         VARCHAR(100) NOT NULL,
+    license_no        VARCHAR(30)  NOT NULL,
+    specialization    VARCHAR(80)  NOT NULL,
+    contact_no        VARCHAR(15)  NULL,
+    available_from    TIME         NOT NULL DEFAULT '08:00:00',
+    available_to      TIME         NOT NULL DEFAULT '20:00:00',
+    consultation_room VARCHAR(10)  NULL,
+    is_active         BOOLEAN      NOT NULL DEFAULT TRUE,
 
     PRIMARY KEY (dentist_id),
-    CONSTRAINT uq_dentists_user    UNIQUE (user_id),
-    CONSTRAINT uq_dentists_license UNIQUE (license_no),
-    CONSTRAINT fk_dentists_user FOREIGN KEY (user_id)
-        REFERENCES users (user_id) ON DELETE RESTRICT
+    CONSTRAINT uq_dentists_license UNIQUE (license_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------

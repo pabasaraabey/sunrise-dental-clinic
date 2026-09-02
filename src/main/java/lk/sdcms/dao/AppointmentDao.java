@@ -25,14 +25,13 @@ public class AppointmentDao {
                    a.status, a.notes, a.created_by, a.created_at,
                    p.patient_id, p.full_name AS patient_name, p.address,
                    p.contact_no, p.email, p.date_of_birth, p.gender,
-                   d.dentist_id, du.full_name AS dentist_name,
+                   d.dentist_id, d.full_name AS dentist_name,
                    d.specialization, d.available_from, d.available_to,
                    t.treatment_id, t.name AS treatment_name,
                    t.base_cost, t.duration_minutes
             FROM appointments a
             JOIN patients   p  ON p.patient_id   = a.patient_id
             JOIN dentists   d  ON d.dentist_id   = a.dentist_id
-            JOIN users      du ON du.user_id     = d.user_id
             JOIN treatments t  ON t.treatment_id = a.treatment_id
             """;
 

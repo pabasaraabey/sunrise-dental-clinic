@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Staff accounts — Sunrise Dental Clinic</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="shell">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+        <h1 class="page-title">Staff accounts</h1>
+        <p class="page-lede">
+            Create logins for reception staff. Accounts are disabled rather than
+            deleted, because appointments and bills record who created them.
+        </p>
+
+        <div id="notice" class="notice"></div>
+
+        <section class="panel">
+            <h2>Create an account</h2>
+            <div class="panel-body">
+                <form id="staffForm" autocomplete="off">
+
+                    <div class="row">
+                        <div class="field">
+                            <label for="fullName">Full name <span class="req">*</span></label>
+                            <input type="text" id="fullName" placeholder="Kamala Silva">
+                            <div class="field-error"></div>
+                        </div>
+                        <div class="field">
+                            <label for="username">Username <span class="req">*</span></label>
+                            <input type="text" id="username" placeholder="kamala">
+                            <div class="field-error"></div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="field">
+                            <label for="role">Role <span class="req">*</span></label>
+                            <select id="role">
+                                <option value="RECEPTIONIST">Receptionist</option>
+                                <option value="ADMINISTRATOR">Administrator</option>
+                            </select>
+                            <div class="field-error"></div>
+                            <p class="hint">
+                                Receptionists handle everything operational.
+                                Administrators can also manage staff accounts.
+                            </p>
+                        </div>
+                        <div class="field">
+                            <label for="password">Password <span class="req">*</span></label>
+                            <input type="password" id="password">
+                            <div class="field-error"></div>
+                            <p class="hint">
+                                At least 8 characters, with an uppercase letter,
+                                a digit and a symbol.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="actions" style="margin-top:16px">
+                        <button type="submit" id="saveBtn">Create account</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Existing accounts</h2>
+            <div class="panel-body" style="padding:0" id="listBody">
+                <p class="empty">Loading…</p>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/validators.js"></script>
+<script>
+let currentUser = null;
+let staff = [];
+
+(async () => {
+    currentUser = await Ui.requireSession();
+    Ui.renderShell(currentUser, 'staff.html');
+
+    // The server refuses this page's endpoints to a receptionist anyway; this
+    // just avoids showing a screen that would only produce 403s.
+    if (currentUser.role !== 'ADMINISTRATOR') {
+        document.querySelector('.main').innerHTML =
+            '<h1 class="page-title">Staff accounts</h1>'
+            + '<div class="notice show warn">Only an administrator can manage '
+            + 'staff accounts.</div>';
+        return;
+    }
+    await load();
+})();
+
+async function load() {
+    try {
+        staff = await Api.staff();
+        render();
+    } catch (error) {
+        Ui.notice('notice', 'error', error.message);
+    }
+}
+
+function render() {
+    document.getElementById('listBody').innerHTML =
+        '<table><thead><tr>'
+        + '<th>Name</th><th>Username</th><th>Role</th><th>Status</th><th></th>'
+        + '</tr></thead><tbody>'
+        + staff.map(u => {
+            const self = u.userId === currentUser.userId;
+            return '<tr>'
+                + '<td>' + Ui.escape(u.fullName)
+                + (self ? ' <span class="pill scheduled">you</span>' : '') + '</td>'
+                + '<td class="tabular">' + Ui.escape(u.username) + '</td>'
+                + '<td>' + Ui.escape(u.role.toLowerCase()) + '</td>'
+                + '<td><span class="pill ' + (u.active ? 'completed' : 'cancelled')
+                + '">' + (u.active ? 'active' : 'disabled') + '</span></td>'
+                + '<td>'
+                + '<a href="#" onclick="resetPassword(' + u.userId + ',\''
+                + Ui.escape(u.username) + '\');return false;">Reset password</a>'
+                // Disabling your own account would lock you out of the only
+                // screen that could re-enable it.
+                + (self ? ''
+                    : ' · <a href="#" onclick="toggle(' + u.userId + ',' + !u.active
+                      + ');return false;">' + (u.active ? 'Disable' : 'Enable') + '</a>')
+                + '</td>'
+                + '</tr>';
+        }).join('')
+        + '</tbody></table>';
+}
+
+async function toggle(id, enable) {
+    Ui.clearNotice('notice');
+    try {
+        const result = await Api.setStaffActive(id, enable);
+        Ui.notice('notice', 'ok', result.message);
+        await load();
+    } catch (error) {
+        Ui.notice('notice', 'error', error.message);
+    }
+}
+
+async function resetPassword(id, username) {
+    const password = prompt('New password for ' + username
+        + '\n\nAt least 8 characters, with an uppercase letter, a digit and a symbol.');
+
+    if (!password) return;
+    Ui.clearNotice('notice');
+
+    try {
+        const result = await Api.resetStaffPassword(id, password);
+        Ui.notice('notice', 'ok', result.message);
+    } catch (error) {
+        Ui.notice('notice', 'error', error.message);
+    }
+}
+
+document.getElementById('staffForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    Ui.clearNotice('notice');
+    Validate.clearAll('staffForm');
+
+    const checks = [
+        Validate.required('fullName', 'Full name'),
+        Validate.required('username', 'Username')
+    ];
+
+    const username = document.getElementById('username').value.trim();
+    if (username && !/^[a-zA-Z0-9._-]{3,50}$/.test(username)) {
+        checks.push(Validate.markInvalid('username',
+            '3 to 50 characters: letters, digits, dot, dash or underscore'));
+    }
+
+    // Mirrors the server-side policy in AuthenticationService. The server
+    // enforces it regardless; this just reports the problem sooner.
+    const password = document.getElementById('password').value;
+    if (!/^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password)) {
+        checks.push(Validate.markInvalid('password',
+            'At least 8 characters, with an uppercase letter, a digit and a symbol'));
+    } else {
+        Validate.markValid('password');
+    }
+
+    if (checks.includes(false)) return;
+
+    const button = document.getElementById('saveBtn');
+    button.disabled = true;
+
+    try {
+        await Api.createStaff({
+            fullName: document.getElementById('fullName').value.trim(),
+            username: username,
+            role:     document.getElementById('role').value,
+            password: password
+        });
+
+        Ui.notice('notice', 'ok', 'Account created for ' + username + '.');
+        document.getElementById('staffForm').reset();
+        await load();
+
+    } catch (error) {
+        Ui.notice('notice', error.status === 409 ? 'warn' : 'error', error.message);
+
+    } finally {
+        button.disabled = false;
+    }
+});
+</script>
+
+</body>
+</html>

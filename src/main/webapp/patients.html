@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Patients — Sunrise Dental Clinic</title>
+<link rel="stylesheet" href="css/app.css">
+<style>
+.mini-stats { display: flex; gap: 24px; flex-wrap: wrap; }
+.mini-stats div { font-size: 12px; color: var(--ink-faint); }
+.mini-stats strong {
+    display: block; font-size: 20px; color: var(--brand-dark);
+    font-variant-numeric: tabular-nums;
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <main class="main">
+        <h1 class="page-title">Patients</h1>
+        <p class="page-lede">
+            Everyone registered at the clinic. A patient is identified by contact
+            number, so someone booking a second time is matched to their existing
+            record rather than being entered again.
+        </p>
+
+        <div id="notice" class="notice"></div>
+
+        <section class="panel">
+            <h2>Overview</h2>
+            <div class="panel-body">
+                <div class="mini-stats" id="miniStats">
+                    <div><strong>—</strong> Loading</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Search</h2>
+            <div class="panel-body">
+                <div class="row">
+                    <div class="field" style="margin-bottom:0">
+                        <label for="filter">Name, contact number or patient id</label>
+                        <input type="text" id="filter" placeholder="Start typing…">
+                        <div class="field-error"></div>
+                    </div>
+                    <div class="field" style="margin-bottom:0">
+                        <label for="onlyReturning">Show</label>
+                        <select id="onlyReturning">
+                            <option value="all">Everyone</option>
+                            <option value="returning">Returning patients only</option>
+                            <option value="new">First-time patients only</option>
+                        </select>
+                        <div class="field-error"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Registered patients</h2>
+            <div class="panel-body" style="padding:0" id="listBody">
+                <p class="empty">Loading…</p>
+            </div>
+        </section>
+
+        <section class="panel" id="historyPanel" style="display:none">
+            <h2 id="historyTitle">Visit history</h2>
+            <div class="panel-body" id="historyBody"></div>
+        </section>
+    </main>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+let activity = [];
+
+(async () => {
+    const user = await Ui.requireSession();
+    Ui.renderShell(user, 'patients.html');
+
+    try {
+        const result = await Api.report('patient-activity');
+        activity = result.rows;
+        renderStats();
+        applyFilter();
+    } catch (error) {
+        Ui.notice('notice', 'error', error.message);
+    }
+})();
+
+function renderStats() {
+    const returning = activity.filter(p => p.returning).length;
+    const visits = activity.reduce((sum, p) => sum + Number(p.visits), 0);
+    const billed = activity.reduce((sum, p) => sum + Number(p.totalBilled), 0);
+
+    document.getElementById('miniStats').innerHTML =
+        mini(activity.length, 'Registered patients')
+        + mini(returning, 'Returning (more than one visit)')
+        + mini(activity.length - returning, 'First-time only')
+        + mini(visits, 'Total visits recorded')
+        + mini('LKR ' + Ui.money(billed), 'Billed across all visits');
+}
+
+function mini(value, label) {
+    return '<div><strong>' + Ui.escape(value) + '</strong>' + Ui.escape(label) + '</div>';
+}
+
+document.getElementById('filter').addEventListener('input', applyFilter);
+document.getElementById('onlyReturning').addEventListener('change', applyFilter);
+
+/* Filtering runs in the browser because a clinic has hundreds of patients,
+   not millions. A round trip per keystroke would be slower and would load
+   the server for no benefit. */
+function applyFilter() {
+    const term = document.getElementById('filter').value.trim().toLowerCase();
+    const mode = document.getElementById('onlyReturning').value;
+
+    let rows = activity.filter(p =>
+        p.patientName.toLowerCase().includes(term)
+        || (p.contactNo || '').includes(term)
+        || String(p.patientId) === term);
+
+    if (mode === 'returning') rows = rows.filter(p => p.returning);
+    if (mode === 'new')       rows = rows.filter(p => !p.returning);
+
+    render(rows);
+}
+
+function render(rows) {
+    const body = document.getElementById('listBody');
+
+    if (!rows.length) {
+        body.innerHTML = '<p class="empty">No patients match.</p>';
+        return;
+    }
+
+    body.innerHTML = '<table><thead><tr>'
+        + '<th>ID</th><th>Name</th><th>Contact</th>'
+        + '<th class="amount">Visits</th><th>First visit</th><th>Last visit</th>'
+        + '<th class="amount">Billed (LKR)</th><th></th>'
+        + '</tr></thead><tbody>'
+        + rows.map(p => '<tr>'
+            + '<td class="tabular">' + p.patientId + '</td>'
+            + '<td>' + Ui.escape(p.patientName)
+            + (p.returning
+                ? ' <span class="pill completed">returning</span>'
+                : ' <span class="pill scheduled">new</span>') + '</td>'
+            + '<td class="tabular">' + Ui.escape(p.contactNo) + '</td>'
+            + '<td class="amount">' + p.visits + '</td>'
+            + '<td class="tabular">' + Ui.escape(p.firstVisit || '—') + '</td>'
+            + '<td class="tabular">' + Ui.escape(p.lastVisit || '—') + '</td>'
+            + '<td class="amount">' + Ui.money(p.totalBilled) + '</td>'
+            + '<td><a href="#" onclick="showHistory(' + p.patientId
+            + ');return false;">Visits</a></td>'
+            + '</tr>').join('')
+        + '</tbody></table>';
+}
+
+async function showHistory(patientId) {
+    Ui.clearNotice('notice');
+
+    try {
+        const data = await Api.patient(patientId);
+        const p = data.patient;
+        const visits = data.visits;
+
+        document.getElementById('historyTitle').textContent =
+            'Visit history — ' + p.fullName;
+
+        document.getElementById('historyBody').innerHTML =
+            '<dl class="detail-grid" style="margin-bottom:18px">'
+            + '<dt>Patient id</dt><dd class="tabular">' + p.patientId + '</dd>'
+            + '<dt>Contact</dt><dd class="tabular">' + Ui.escape(p.contactNo) + '</dd>'
+            + '<dt>Age</dt><dd>' + p.age
+            + (p.seniorCitizen ? ' — senior concession applies' : '') + '</dd>'
+            + '<dt>Address</dt><dd>' + Ui.escape(p.address) + '</dd>'
+            + '<dt>Visits</dt><dd>' + visits.length + '</dd>'
+            + '</dl>'
+            + (visits.length
+                ? '<table><thead><tr><th>Date</th><th>Appointment</th>'
+                  + '<th>Dentist</th><th>Treatment</th>'
+                  + '<th class="amount">Cost</th><th>Status</th></tr></thead><tbody>'
+                  + visits.map(v => '<tr>'
+                      + '<td class="tabular">' + Ui.escape(v.appointmentDate)
+                      + ' ' + Ui.escape(v.appointmentTime) + '</td>'
+                      + '<td class="tabular">' + Ui.escape(v.appointmentNo) + '</td>'
+                      + '<td>' + Ui.escape(v.dentistName) + '</td>'
+                      + '<td>' + Ui.escape(v.treatmentName) + '</td>'
+                      + '<td class="amount">' + Ui.money(v.treatmentCost) + '</td>'
+                      + '<td><span class="pill ' + v.status.toLowerCase() + '">'
+                      + Ui.escape(v.status.replace('_', ' ')) + '</span></td>'
+                      + '</tr>').join('')
+                  + '</tbody></table>'
+                : '<p class="empty">No visits recorded yet.</p>');
+
+        const panel = document.getElementById('historyPanel');
+        panel.style.display = '';
+        panel.scrollIntoView({ behavior: 'smooth' });
+
+    } catch (error) {
+        Ui.notice('notice', 'error', error.message);
+    }
+}
+</script>
+
+</body>
+</html>

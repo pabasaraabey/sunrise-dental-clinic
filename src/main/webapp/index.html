@@ -5,6 +5,84 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dashboard — Sunrise Dental Clinic</title>
 <link rel="stylesheet" href="css/app.css">
+<style>
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}
+.stat {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--brand);
+    border-radius: var(--radius);
+    padding: 13px 15px;
+}
+.stat .value {
+    font-size: 25px;
+    font-weight: 700;
+    color: var(--brand-dark);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+}
+.stat .label {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-top: 3px;
+}
+.stat .sub { font-size: 11px; color: var(--ink-faint); margin-top: 2px; }
+.stat.money   { border-left-color: var(--accent-line); }
+.stat.warn    { border-left-color: var(--warn-line); }
+.stat.pending { border-left-color: var(--danger); }
+
+/* Tabs — the receptionist's work queue lives behind these. */
+.tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid var(--line);
+    background: var(--brand-tint);
+    padding: 0 8px;
+}
+.tabs button {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    color: var(--ink-soft);
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 11px 14px;
+}
+.tabs button:hover { background: transparent; color: var(--brand); }
+.tabs button.active {
+    color: var(--brand);
+    border-bottom-color: var(--brand);
+    background: transparent;
+}
+.tabs .count {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 9px;
+    background: var(--brand);
+    color: #FFF;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+.tabs button:not(.active) .count { background: var(--ink-faint); }
+
+.chart-row {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+@media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
+</style>
 </head>
 <body>
 
@@ -17,19 +95,49 @@
 
         <div id="notice" class="notice"></div>
 
-        <section class="panel">
-            <h2>Appointment schedule</h2>
-            <div class="panel-body" style="padding:0">
-                <div id="scheduleArea">
-                    <p class="empty">Loading today's schedule…</p>
+        <div class="stat-grid" id="statGrid"></div>
+
+        <div class="chart-row">
+            <section class="panel" style="margin:0">
+                <h2>Bookings over the last 30 days</h2>
+                <div class="panel-body" id="trendChart">
+                    <p class="empty">Loading…</p>
                 </div>
+            </section>
+
+            <section class="panel" style="margin:0">
+                <h2>This month's outcomes</h2>
+                <div class="panel-body" id="outcomeChart">
+                    <p class="empty">Loading…</p>
+                </div>
+            </section>
+        </div>
+
+        <section class="panel">
+            <h2>Appointment queue</h2>
+            <div class="tabs" id="tabs">
+                <button class="active" onclick="showTab('pending', this)">
+                    To be seen<span class="count" id="cPending">0</span></button>
+                <button onclick="showTab('completed', this)">
+                    Completed<span class="count" id="cCompleted">0</span></button>
+                <button onclick="showTab('closed', this)">
+                    Cancelled &amp; missed<span class="count" id="cClosed">0</span></button>
+                <button onclick="showTab('all', this)">
+                    All today<span class="count" id="cAll">0</span></button>
+            </div>
+            <div id="queueArea">
+                <p class="empty">Loading today's schedule…</p>
             </div>
         </section>
     </main>
 </div>
 
 <script src="js/api.js"></script>
+<script src="js/charts.js"></script>
 <script>
+let todaysAppointments = [];
+let activeTab = 'pending';
+
 (async () => {
     const user = await Ui.requireSession();
     Ui.renderShell(user, 'index.html');
@@ -38,40 +146,188 @@
         new Date().toLocaleDateString('en-GB',
             { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
+    // Loaded in parallel: a slow chart query should not hold up the queue,
+    // which is the part reception actually works from.
+    loadStats();
+    loadCharts();
+    loadQueue();
+})();
+
+async function loadStats() {
     try {
-        const appointments = await Api.appointmentsOn(Ui.today());
-        const area = document.getElementById('scheduleArea');
+        const s = await Api.report('summary', { date: Ui.today() });
 
-        if (!appointments.length) {
-            area.innerHTML =
-                '<p class="empty">No appointments booked for today.<br>'
-                + '<a href="booking.html">Book the first one</a></p>';
-            return;
-        }
-
-        area.innerHTML =
-            '<table><thead><tr>'
-            + '<th>Time</th><th>Appointment</th><th>Patient</th>'
-            + '<th>Dentist</th><th>Treatment</th><th>Status</th>'
-            + '</tr></thead><tbody>'
-            + appointments.map(a =>
-                '<tr>'
-                + '<td class="tabular">' + Ui.escape(a.appointmentTime) + '</td>'
-                + '<td class="tabular">' + Ui.escape(a.appointmentNo) + '</td>'
-                + '<td>' + Ui.escape(a.patientName) + '</td>'
-                + '<td>' + Ui.escape(a.dentistName) + '</td>'
-                + '<td>' + Ui.escape(a.treatmentName) + '</td>'
-                + '<td><span class="pill ' + a.status.toLowerCase() + '">'
-                + Ui.escape(a.status.replace('_', ' ')) + '</span></td>'
-                + '</tr>').join('')
-            + '</tbody></table>';
+        document.getElementById('statGrid').innerHTML =
+            stat(s.scheduled, 'To be seen today', 'pending')
+            + stat(s.completed, 'Completed today', '')
+            + stat(s.total, 'Booked today', '')
+            + stat('LKR ' + Ui.money(s.revenueToday), 'Billed today', 'money')
+            + stat(s.bookingsThisMonth, 'Bookings this month', '')
+            + stat(s.newPatientsThisMonth, 'New patients this month', '')
+            + stat('LKR ' + Ui.money(s.revenueThisMonth), 'Revenue this month', 'money')
+            + stat(s.unbilledCompleted, 'Awaiting billing',
+                   s.unbilledCompleted > 0 ? 'warn' : '');
 
     } catch (error) {
+        document.getElementById('statGrid').innerHTML = '';
+    }
+}
+
+function stat(value, label, variant) {
+    return '<div class="stat ' + variant + '">'
+        + '<div class="value">' + Ui.escape(value) + '</div>'
+        + '<div class="label">' + Ui.escape(label) + '</div>'
+        + '</div>';
+}
+
+async function loadCharts() {
+    const from = new Date();
+    from.setDate(from.getDate() - 29);
+    const fromDate = from.toISOString().slice(0, 10);
+
+    try {
+        const trend = await Api.report('trend', {
+            from: fromDate, to: Ui.today(), granularity: 'day'
+        });
+
+        // Short labels: the full ISO date repeated 30 times is unreadable.
+        const labels = trend.rows.map(r => r.bucket.slice(5));
+
+        document.getElementById('trendChart').innerHTML = trend.rows.length
+            ? Chart.line(labels, [
+                { name: 'Bookings', values: trend.rows.map(r => r.bookings) }
+              ])
+            : Chart.empty('No bookings in the last 30 days.');
+
+        const totals = trend.rows.reduce((acc, r) => ({
+            completed: acc.completed + Number(r.completed),
+            cancelled: acc.cancelled + Number(r.cancelled),
+            noShow:    acc.noShow    + Number(r.noShow),
+            pending:   acc.pending   + (Number(r.bookings) - Number(r.completed)
+                                        - Number(r.cancelled) - Number(r.noShow))
+        }), { completed: 0, cancelled: 0, noShow: 0, pending: 0 });
+
+        document.getElementById('outcomeChart').innerHTML = Chart.proportion([
+            { label: 'Completed', value: totals.completed },
+            { label: 'Still to come', value: totals.pending },
+            { label: 'Cancelled', value: totals.cancelled },
+            { label: 'No-show', value: totals.noShow }
+        ], { emptyText: 'Nothing recorded this month yet.' });
+
+    } catch (error) {
+        document.getElementById('trendChart').innerHTML =
+            Chart.empty('The chart could not be loaded.');
+        document.getElementById('outcomeChart').innerHTML = '';
+    }
+}
+
+async function loadQueue() {
+    try {
+        todaysAppointments = await Api.appointmentsOn(Ui.today());
+        updateCounts();
+        renderQueue();
+    } catch (error) {
         Ui.notice('notice', 'error', error.message);
-        document.getElementById('scheduleArea').innerHTML =
+        document.getElementById('queueArea').innerHTML =
             '<p class="empty">The schedule could not be loaded.</p>';
     }
-})();
+}
+
+function updateCounts() {
+    const by = (status) => todaysAppointments.filter(a => a.status === status).length;
+    document.getElementById('cPending').textContent   = by('SCHEDULED');
+    document.getElementById('cCompleted').textContent = by('COMPLETED');
+    document.getElementById('cClosed').textContent    = by('CANCELLED') + by('NO_SHOW');
+    document.getElementById('cAll').textContent       = todaysAppointments.length;
+}
+
+function showTab(tab, button) {
+    activeTab = tab;
+    document.querySelectorAll('#tabs button')
+        .forEach(b => b.classList.remove('active'));
+    button.classList.add('active');
+    renderQueue();
+}
+
+function filtered() {
+    switch (activeTab) {
+        case 'pending':   return todaysAppointments.filter(a => a.status === 'SCHEDULED');
+        case 'completed': return todaysAppointments.filter(a => a.status === 'COMPLETED');
+        case 'closed':    return todaysAppointments.filter(a =>
+                              a.status === 'CANCELLED' || a.status === 'NO_SHOW');
+        default:          return todaysAppointments;
+    }
+}
+
+function renderQueue() {
+    const rows = filtered();
+    const area = document.getElementById('queueArea');
+
+    if (!rows.length) {
+        area.innerHTML = '<p class="empty">'
+            + (activeTab === 'pending'
+                ? 'Nothing left to see today.'
+                : 'Nothing here.')
+            + (todaysAppointments.length === 0
+                ? '<br><a href="booking.html">Book an appointment</a>' : '')
+            + '</p>';
+        return;
+    }
+
+    area.innerHTML = '<table><thead><tr>'
+        + '<th>Time</th><th>Appointment</th><th>Patient</th><th>Contact</th>'
+        + '<th>Dentist</th><th>Treatment</th><th>Status</th><th>Action</th>'
+        + '</tr></thead><tbody>'
+        + rows.map(a => '<tr>'
+            + '<td class="tabular">' + Ui.escape(a.appointmentTime) + '</td>'
+            + '<td class="tabular">' + Ui.escape(a.appointmentNo) + '</td>'
+            + '<td>' + Ui.escape(a.patientName) + '</td>'
+            + '<td class="tabular">' + Ui.escape(a.contactNo) + '</td>'
+            + '<td>' + Ui.escape(a.dentistName) + '</td>'
+            + '<td>' + Ui.escape(a.treatmentName) + '</td>'
+            + '<td><span class="pill ' + a.status.toLowerCase() + '">'
+            + Ui.escape(a.status.replace('_', ' ')) + '</span></td>'
+            + '<td>' + actions(a) + '</td>'
+            + '</tr>').join('')
+        + '</tbody></table>';
+}
+
+function actions(a) {
+    if (a.status === 'SCHEDULED') {
+        return '<a href="#" onclick="finish(\'' + a.appointmentNo
+             + '\',\'COMPLETED\');return false;">Mark seen</a>'
+             + ' · <a href="#" onclick="finish(\'' + a.appointmentNo
+             + '\',\'NO_SHOW\');return false;">No-show</a>';
+    }
+    if (a.status === 'COMPLETED') {
+        return '<a href="billing.html?no=' + encodeURIComponent(a.appointmentNo)
+             + '">Bill</a>';
+    }
+    return '<span style="color:var(--ink-faint)">—</span>';
+}
+
+async function finish(appointmentNo, status) {
+    Ui.clearNotice('notice');
+
+    try {
+        await Api.setAppointmentStatus(appointmentNo, status);
+
+        Ui.notice('notice', 'ok', status === 'COMPLETED'
+            ? appointmentNo + ' marked as seen. It is ready to bill.'
+            : appointmentNo + ' recorded as a no-show.');
+
+        // Reload rather than patching the row in place: the counters and the
+        // charts both move, and keeping them consistent by hand is how they
+        // end up disagreeing.
+        await loadQueue();
+        loadStats();
+
+    } catch (error) {
+        // 422 means the state machine refused the transition — already
+        // completed, or cancelled — rather than anything being broken.
+        Ui.notice('notice', error.status === 422 ? 'warn' : 'error', error.message);
+    }
+}
 </script>
 
 </body>

@@ -2,6 +2,7 @@ package lk.sdcms.model;
 
 import java.util.Set;
 
+/** Everything a receptionist may do, plus staff account management. */
 public class Administrator extends User {
 
     public Administrator() {
@@ -11,12 +12,13 @@ public class Administrator extends User {
     @Override
     public Set<String> getPermissions() {
         return Set.of(
-                "USER_MANAGE",
+                "PATIENT_MANAGE",
+                "APPOINTMENT_MANAGE",
+                "BILL_MANAGE",
                 "DENTIST_MANAGE",
-                "TREATMENT_PRICE_MANAGE",
-                "APPOINTMENT_VIEW",
-                "REPORT_VIEW_ALL",
-                "REPORT_REVENUE"
+                "TREATMENT_MANAGE",
+                "REPORT_VIEW",
+                "USER_MANAGE"
         );
     }
 }
